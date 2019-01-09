@@ -102,3 +102,15 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+#Project specific ignore:
+CMakeLists.txt  
+obstacle_avoidance.py  
+robobo/
+*.png
+irs_test.py     
+read_irs.py
+robobo_msgs/
+send_commands.py
+vrep/
+
