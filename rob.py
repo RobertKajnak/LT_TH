@@ -15,7 +15,10 @@ if __name__ == "__main__":
     #    rob.move(30, 30,1000)
     #    sense = rob.read_irs()
     im = rob.get_image_front()
-    rob.talk(im)
+    
+    image = rob.get_image_front()
+    rob.talk(vision.color_per_area(image))
+    #cv2.imwrite("test_pictures_0.png",image)
     
     print(sense)
     rob.talk('Found somethign')
