@@ -20,8 +20,8 @@ class Sensors:
                 ]
         else:
             self.touching = 5
-            self.thesholds =  [[0.055,0.17] for i in range(3)]+ \
-                                [[0.055,0.17] for i in range(5)]
+            self.thesholds =  [[0.05,0.17] for i in range(3)]+ \
+                                [[0.05,0.17] for i in range(5)]
                 
         
     def continuous(self):

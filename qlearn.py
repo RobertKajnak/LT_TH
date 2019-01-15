@@ -84,7 +84,6 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
             else:
                 action = np.argmax(q_table[state]) # Exploit learned values
             
-            
             move.move(action)
             next_state = 0
             sens_val, collision = sens.binary()
