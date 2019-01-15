@@ -32,7 +32,7 @@ class Sensors:
             disc=[]
             sens = self.continuous()
             for idx,val in enumerate(sens):
-                if val==False:
+                if val==False or val>=self.thesholds[idx][1]:
                     disc.append(self.out)
                 elif val>=self.thesholds[idx][0]:
                     disc.append(self.close)

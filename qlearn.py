@@ -95,7 +95,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
 #                print("{0:.4f}".format(v),end=', ')
 #            print('')
             #print(sc)
-            print(sens.strings())
+            #print(sens.strings())
             #print(next_state)
             #print(sens_val)
             reward = get_reward(action, sens_val)
