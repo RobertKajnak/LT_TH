@@ -26,17 +26,20 @@ def _most_non_white_color(im):
     return []
 
 
-def color_per_area(image, area_size=(3,3), downsampling_rate = 10):
+def color_per_area(image, area_size=(4,3), downsampling_rate = 10):
     w = image.shape[0]
     h = image.shape[1]
+    print(image.shape)
     
     downsampled = np.empty((np.int(w/downsampling_rate)+1,np.int(h/downsampling_rate)+1),dtype=np.unicode)
-    
+    print(downsampled.shape)
+    print(w)
+    print(h)
     xd=0
     for x in np.arange(0,h,downsampling_rate):
         yd=0
         for y in np.arange(0,w,downsampling_rate):
-            downsampled[xd][yd] = closest_color(image[x,y])[0]
+            downsampled[xd][yd] = closest_color(image[y][x])[0]
             yd+=1
         xd+=1
     
