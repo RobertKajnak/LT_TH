@@ -30,9 +30,9 @@ rewards = {0:10,
            3:1,
            4:1}
 def get_reward(action, sensors_one_hot):
-    if np.any(sensors_one_hot[1::2]):
-        return rewards[action]*5
-    else:
+    #if np.any(np.array(sensors_one_hot)):
+    #    return rewards[action]*5
+    #else:
         return rewards[action]
         
 
@@ -56,7 +56,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
     if starting_qtable_filename:
         q_table = np.load(starting_qtable_filename)
     else:
-        q_table = np.zeros([2**8, 5])
+        q_table = np.zeros([2**8*5, 5])
 
     # Hyperparameters
     alpha = 0.1
@@ -68,7 +68,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
     all_collisions = np.load(all_collisions_filename) if all_collisions_filename else []
     all_rewards = np.load(all_rewards_filename) if all_rewards_filename else []
     
-    for i in range(1, 2200):
+    for i in range(1, 5000):
         #state = env.reset()
         rob.stop_world()
         time.sleep(3)
@@ -76,9 +76,11 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
         state = 0
     
         epochs, collisions, reward, reward_total = 0, 0, 0, 0
+        action = 0
         done = False
         
         while not done:
+            prev_action = action
             if random.uniform(0, 1) < epsilon:
                 action = random.choice(range(5))
             else:
@@ -89,7 +91,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
             sens_val, collision = sens.binary()
             for j in range(8):
                 next_state+=sens_val[j]*2**(j)
-            
+            next_state+=256*prev_action
 #            sc = sens.continuous()
 #            for v in sc:
 #                print("{0:.4f}".format(v),end=', ')
@@ -102,9 +104,9 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
                     
             reward_total+=reward
             
-            done = True if (rob.getTime() > 30000 or collision) else False 
-            if done:
-                reward = -90;
+            done = True if (rob.getTime() > 90000) else False 
+            if collision:
+                reward = -50;
             old_value = q_table[state, action]
             next_max = np.max(q_table[next_state])
             
@@ -133,26 +135,38 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
     
 def test(q_table_filename):
     #rob = robobo.SimulationRobobo().connect(address='192.168.178.10', port=19997)
+    #rob = robobo.SimulationRobobo().connect(address='192.168.1.6', port=19997)
     rob = robobo.HardwareRobobo(camera=True).connect(address="192.168.1.7")
-    move = motion.Motion(rob,False,speed=50,time=500)
+    move = motion.Motion(rob,False,speed=30,time=500)
    
     sens = irsensors.Sensors(rob,False)
     
     q_table = np.load(q_table_filename)
     
     #rob.play_simulation()
+
+    init = False
     
-    done = False
-    
-    while not done:
+    while not heardEnter():
         state = 0
-        sens_val, collision = sens.one_hot()
-        for j in range(1,16,2):
-            state+=sens_val[j]*2**((j-1)/2)
+        sens_val, collision = sens.binary()
+        for j in range(8):
+            state+=sens_val[j]*2**(j)
         action = np.argmax(q_table[state])
         print(sens_val)
-        move.move(action)
         
+        if not init:
+            if not np.any(np.array(sens.continuous())>0.1):
+                print('All sensors null')
+                rob.talk('Touch me')
+                rob.sleep(1)
+                continue
+            else:
+                init = True
+            
+        move.move(action)
+
         
 if __name__ == "__main__":
     train()
+    #test('q_table590.npy')

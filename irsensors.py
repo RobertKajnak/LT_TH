@@ -20,7 +20,7 @@ class Sensors:
                 ]
         else:
             self.touching = 5
-            self.thesholds =  [[0.05,0.17] for i in range(3)]+ \
+            self.thesholds =  [[0.01,0.17] for i in range(3)]+ \
                                 [[0.05,0.17] for i in range(5)]
                 
         
@@ -67,7 +67,7 @@ class Sensors:
         hot = []
         hit = False
         for val in disc:
-            hot.append(int(val==self.close))
+            hot.append(int(val==self.close or val==self.collision))
             if val==self.collision:
                 hit=True
         return hot, hit
