@@ -44,7 +44,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
     '''
     #rob = robobo.SimulationRobobo().connect(address='192.168.178.10', port=19997)
     #rob = robobo.SimulationRobobo().connect(address='196.168.137.1', port=19997)
-    rob = robobo.SimulationRobobo().connect(address='192.168.1.6', port=19997)
+    rob = robobo.SimulationRobobo().connect(address='192.168.1.15', port=19997)
     #rob = robobo.HardwareRobobo(camera=True).connect(address="192.168.1.15")
 
     move = motion.Motion(rob,True,speed=30,time=500)
@@ -102,11 +102,13 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
             #print(sens_val)
             reward = get_reward(action, sens_val)
                     
-            reward_total+=reward
             
             done = True if (rob.getTime() > 90000) else False 
             if collision:
                 reward = -50;
+                
+            reward_total+=reward
+            
             old_value = q_table[state, action]
             next_max = np.max(q_table[next_state])
             
