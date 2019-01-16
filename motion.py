@@ -23,6 +23,12 @@ class Motion:
     def spin_left(self):
         self.rob.move(-self.speed, self.speed,self.time)
         
+    def backwards_right(self):
+        self.rob.move(-self.speed*2, -self.speed/2,self.time)
+        
+    def backwards_left(self):
+        self.rob.move(-self.speed/2, -self.speed*2,self.time)
+        
     def backwards(self):
         self.rob.move(-self.speed, -self.speed,self.time)
 
@@ -34,7 +40,9 @@ class Motion:
             2 => turn left
             3 => spin right
             4 => spin left
-            5 => go backwards
+            5 => go back while turning right (the same right as in the front)
+            6 => go back while turning left (the same left as in the front)
+            7 => go backwards
             -1 => randomly choose from [0,4], i.e. anything but backwards
             anything else => choose from [0,5] i.e. anything goes
         '''
@@ -49,6 +57,10 @@ class Motion:
         elif action_code==4:
             self.spin_left()
         elif action_code==5:
+            self.backwards_right()
+        elif action_code==6:
+            self.backwards_left()
+        elif action_code==7:
             self.backwards()
         elif action_code==-1:
             self.move(random.choice(range(5)))

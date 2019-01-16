@@ -27,8 +27,10 @@ def heardEnter():
 rewards = {0:10,
            1:5,
            2:5,
-           3:1,
-           4:1}
+           3:2,
+           4:2,
+           5:1,
+           6:1}
 def get_reward(action, sensors_one_hot):
     #if np.any(np.array(sensors_one_hot)):
     #    return rewards[action]*5
@@ -56,7 +58,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
     if starting_qtable_filename:
         q_table = np.load(starting_qtable_filename)
     else:
-        q_table = np.zeros([2**8*5, 5])
+        q_table = np.zeros([2**8*7, 7])
 
     # Hyperparameters
     alpha = 0.1
@@ -82,7 +84,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
         while not done:
             prev_action = action
             if random.uniform(0, 1) < epsilon:
-                action = random.choice(range(5))
+                action = random.choice(range(7))
             else:
                 action = np.argmax(q_table[state]) # Exploit learned values
             
@@ -103,7 +105,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
             reward = get_reward(action, sens_val)
                     
             
-            done = True if (rob.getTime() > 90000) else False 
+            done = True if (rob.getTime() > 90000 or collisions>2) else False 
             if collision:
                 reward = -50;
                 
