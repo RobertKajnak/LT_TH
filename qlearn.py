@@ -24,11 +24,11 @@ def heardEnter():
             return True
     return False
 
-rewards = {0:10,
-           1:5,
-           2:5,
-           3:2,
-           4:2,
+rewards = {0:25,
+           1:15,
+           2:15,
+           3:5,
+           4:5,
            5:1,
            6:1}
 def get_reward(action, sensors_one_hot):
@@ -88,6 +88,9 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
             else:
                 action = np.argmax(q_table[state]) # Exploit learned values
             
+            # so that it doesn't jump around
+            if (prev_action>=5 and action<5) or (prev_action<5 and action>5):
+                time.sleep(0.5)
             move.move(action)
             next_state = 0
             sens_val, collision = sens.binary()
@@ -140,7 +143,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
 def test(q_table_filename):
     #rob = robobo.SimulationRobobo().connect(address='192.168.178.10', port=19997)
     #rob = robobo.SimulationRobobo().connect(address='192.168.1.6', port=19997)
-    rob = robobo.HardwareRobobo(camera=True).connect(address="192.168.1.7")
+    rob = robobo.HardwareRobobo(camera=True).connect(address="192.168.1.13")
     move = motion.Motion(rob,False,speed=30,time=500)
    
     sens = irsensors.Sensors(rob,False)
@@ -165,12 +168,17 @@ def test(q_table_filename):
                 rob.talk('Touch me')
                 rob.sleep(1)
                 continue
-            else:
+            elif not init:
                 init = True
+                time.sleep(1)
+                rob.talk('Get away from me!')
+                time.sleep(2)
+                sens.set_sensor_baseline()
+                rob.talk('Baseline set. Starting Patrol')
             
         move.move(action)
 
         
 if __name__ == "__main__":
-    train()
-    #test('q_table590.npy')
+    #train()
+    test('q_table590_nofollow.npy')

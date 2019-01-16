@@ -23,7 +23,11 @@ class Sensors:
             self.thesholds =  [[0.01,0.17] for i in range(3)]+ \
                                 [[0.05,0.17] for i in range(5)]
                 
-        
+    def set_sensor_baseline(self):
+        cont = self.continuous()
+        for idx,val in enumerate(cont):
+            self.thesholds[idx][0] = val*1.1
+    
     def continuous(self):
         return self.rob.read_irs()
     
