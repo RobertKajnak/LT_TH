@@ -8,7 +8,7 @@ class Sensors:
         self.is_simulation = is_simulation
         if not is_simulation:
             self.touching = 1500
-            self.thesholds =  [
+            self.thresholds =  [
                 [25,200,self.touching],
                 [25,200,self.touching],
                 [30,150,self.touching],
@@ -20,13 +20,15 @@ class Sensors:
                 ]
         else:
             self.touching = 5
-            self.thesholds =  [[0.01,0.17] for i in range(3)]+ \
-                                [[0.05,0.17] for i in range(5)]
+            self.thresholds =  [[0.01,0.17] for i in range(3)]+ \
+                                [[0.05,0.17] for i in range(2)] +\
+                                [[0.01,0.17] for i in range(1)] +\
+                                [[0.05,0.17] for i in range(2)]
                 
     def set_sensor_baseline(self):
         cont = self.continuous()
         for idx,val in enumerate(cont):
-            self.thesholds[idx][0] = val*1.1
+            self.thresholds[idx][0] = val*1.1
     
     def continuous(self):
         return self.rob.read_irs()
@@ -36,9 +38,9 @@ class Sensors:
             disc=[]
             sens = self.continuous()
             for idx,val in enumerate(sens):
-                if val==False or val>=self.thesholds[idx][1]:
+                if val==False or val>=self.thresholds[idx][1]:
                     disc.append(self.out)
-                elif val>=self.thesholds[idx][0]:
+                elif val>=self.thresholds[idx][0]:
                     disc.append(self.close)
                 else:
                     disc.append(self.collision)
@@ -47,9 +49,9 @@ class Sensors:
             disc=[]
             sens = self.continuous()
             for idx,val in enumerate(sens):
-                if val<=self.thesholds[idx][0]:
+                if val<=self.thresholds[idx][0]:
                     disc.append(self.out)
-                elif val<=self.thesholds[idx][1]:
+                elif val<=self.thresholds[idx][1]:
                     disc.append(self.close)
                 else:
                     disc.append(self.collision)
