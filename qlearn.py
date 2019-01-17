@@ -25,16 +25,21 @@ def heardEnter():
     return False
 
 rewards = {0:25,
-           1:15,
-           2:15,
-           3:5,
-           4:5,
-           5:1,
-           6:1}
-def get_reward(action, sensors_one_hot):
-    #if np.any(np.array(sensors_one_hot)):
-    #    return rewards[action]*5
-    #else:
+           1:17,
+           2:17,
+           3:7,
+           4:7,
+           5:2,
+           6:2}
+def get_reward(action, last_action, collision):
+    # make sure it doesn't go in arc back and forward
+    if collision:
+        return -50;
+    #going back and forwards is not a motion
+    elif (last_action<=1 and action==5) or ((last_action==2 or last_action==0) and action==4) or \
+       (last_action==5 and action<=1) or (last_action==4 and (action==2 or action==0)):
+           return -2
+    else:
         return rewards[action]
         
 
@@ -44,9 +49,9 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
         starting_episode==None starts from scratch
         
     '''
-    #rob = robobo.SimulationRobobo().connect(address='192.168.178.10', port=19997)
+    rob = robobo.SimulationRobobo().connect(address='192.168.178.24', port=19997)
     #rob = robobo.SimulationRobobo().connect(address='196.168.137.1', port=19997)
-    rob = robobo.SimulationRobobo().connect(address='192.168.1.15', port=19997)
+    #rob = robobo.SimulationRobobo().connect(address='192.168.1.15', port=19997)
     #rob = robobo.HardwareRobobo(camera=True).connect(address="192.168.1.15")
 
     move = motion.Motion(rob,True,speed=30,time=500)
@@ -70,7 +75,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
     all_collisions = np.load(all_collisions_filename) if all_collisions_filename else []
     all_rewards = np.load(all_rewards_filename) if all_rewards_filename else []
     
-    for i in range(1, 5000):
+    for i in range(1, 1000):
         #state = env.reset()
         rob.stop_world()
         time.sleep(3)
@@ -90,7 +95,9 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
             
             # so that it doesn't jump around
             if (prev_action>=5 and action<5) or (prev_action<5 and action>5):
-                time.sleep(0.5)
+                #print('Wierd physics detectd')
+                time.sleep(1.5)
+                
             move.move(action)
             next_state = 0
             sens_val, collision = sens.binary()
@@ -105,12 +112,10 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
             #print(sens.strings())
             #print(next_state)
             #print(sens_val)
-            reward = get_reward(action, sens_val)
+            reward = get_reward(action, prev_action,collision)
                     
             
-            done = True if (rob.getTime() > 90000 or collisions>2) else False 
-            if collision:
-                reward = -50;
+            done = True if (rob.getTime() > 90000 or collisions>=2) else False 
                 
             reward_total+=reward
             
@@ -180,5 +185,5 @@ def test(q_table_filename):
 
         
 if __name__ == "__main__":
-    #train()
-    test('q_table590_nofollow.npy')
+    train()
+    #test('q_table590_nofollow.npy')
