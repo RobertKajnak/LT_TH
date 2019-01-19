@@ -32,7 +32,7 @@ rewards = {0:25,
 
 def get_reward(action, last_action, collision):
     if collision:
-        return -50;
+        return -80;
     #going back and forwards is not a proper movement
     #elif (last_action<=1 and action==5) or ((last_action==2 or last_action==0) and action==6) or \
     #   (last_action==5 and action<=1) or (last_action==6 and (action==2 or action==0)):
@@ -54,7 +54,7 @@ def train(IP,is_simulation=True,
         rob = robobo.SimulationRobobo().connect(address=IP, port=19997)
     else:
         rob = robobo.HardwareRobobo(camera=True).connect(address=IP)
-    move = motion.Motion(rob,is_simulation,speed=30,time=500)
+    move = motion.Motion(rob,is_simulation,speed=25,time=500)
     sens = irsensors.Sensors(rob,is_simulation)
    
     #initialize Q-table
@@ -65,11 +65,13 @@ def train(IP,is_simulation=True,
 
     # Hyperparameters
     # Add adaptive parameters
-    alpha = 0.1
-    gamma = 0.6
-    epsilon = 0.1
+    alpha_base = 0.4 #learning rate
+    gamma = 0.75 #future reward
+    epsilon = 0.3 #exploration
     
     time_limit = 90000
+    max_iterations= 300
+    halving = max_iterations/12
     
     # For plotting metrics
     all_collisions = np.load(all_collisions_filename) if all_collisions_filename else []
@@ -78,7 +80,13 @@ def train(IP,is_simulation=True,
     furthest_distance = np.load(furthest_distance_filename) if furthest_distance_filename else []
     all_positions = np.load(all_positions_filename) if all_positions_filename else []
     
-    for i in range(1, 300):
+    for i in range(0, max_iterations):
+        #update hyperparams
+        if i%halving==0 and i>0:
+            epsilon/=2
+        alpha = alpha_base*(0.1+float(max_iterations-i)/max_iterations)
+        print('a={:.3f}, e={:.3f}'.format(alpha,epsilon))
+
         #initialize World
         rob.stop_world()
         time.sleep(3)
@@ -140,11 +148,11 @@ def train(IP,is_simulation=True,
             collisions += int(collision)
             
             #check for termination criteria            
-            done = True if (rob.getTime() > time_limit or collisions>=1) else False 
+            done = True if (rob.getTime() > time_limit or collisions>=2) else False 
             
             
         #Append current simulation statistics to total statistics
-        all_collisions.append(1 if collision else 0)
+        all_collisions.append(collisions)
         all_rewards.append(reward_total)
         all_steps_survived.append(steps_survived)
         furthest_distance.append(distance_max)
