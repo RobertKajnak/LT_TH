@@ -30,14 +30,16 @@ def get_reward(action, last_action, collision):
     if collision:
         return -50;
     #going back and forwards is not a motion
-    elif (last_action<=1 and action==5) or ((last_action==2 or last_action==0) and action==4) or \
-       (last_action==5 and action<=1) or (last_action==4 and (action==2 or action==0)):
+    elif (last_action<=1 and action==5) or ((last_action==2 or last_action==0) and action==6) or \
+       (last_action==5 and action<=1) or (last_action==6 and (action==2 or action==0)):
            return -2
     else:
         return rewards[action]
         
 
-def train(IP,is_simulation=True,starting_qtable_filename=None, all_collisions_filename=None,all_rewards_filename=None):
+def train(IP,is_simulation=True,
+          starting_qtable_filename=None, all_collisions_filename=None,all_rewards_filename=None,
+          steps_survived_filename = None):
     '''
     params:
         starting_episode==None starts from scratch
@@ -64,10 +66,12 @@ def train(IP,is_simulation=True,starting_qtable_filename=None, all_collisions_fi
     gamma = 0.6
     epsilon = 0.1
     
+    time_limit = 90000
     # For plotting metrics
     #all_epochs = []
     all_collisions = np.load(all_collisions_filename) if all_collisions_filename else []
     all_rewards = np.load(all_rewards_filename) if all_rewards_filename else []
+    all_steps_survived = np.load(steps_survived_filename) if steps_survived_filename else []
     
     for i in range(1, 300):
         #state = env.reset()
@@ -76,7 +80,7 @@ def train(IP,is_simulation=True,starting_qtable_filename=None, all_collisions_fi
         rob.play_simulation()
         state = 0
     
-        epochs, collisions, reward, reward_total = 0, 0, 0, 0
+        epochs, collisions, reward, reward_total,steps_survived = 0, 0, 0, 0, -1
         action = 0
         done = False
         
@@ -109,9 +113,10 @@ def train(IP,is_simulation=True,starting_qtable_filename=None, all_collisions_fi
             reward = get_reward(action, prev_action,collision)
                     
             
-            done = True if (rob.getTime() > 60000 or collisions>=1) else False 
+            done = True if (rob.getTime() > time_limit or collisions>=1) else False 
                 
             reward_total+=reward
+            steps_survived+=1
             
             old_value = q_table[state, action]
             next_max = np.max(q_table[next_state])
@@ -126,9 +131,10 @@ def train(IP,is_simulation=True,starting_qtable_filename=None, all_collisions_fi
             epochs += 1
         all_collisions.append(0 if collision else 1)
         all_rewards.append(reward_total)
+        all_steps_survived.append(steps_survived)
         np.save('tables/q_table{}'.format(i),q_table)
         #if i % 10 == 0:
-        print('Episode: {}, reward:{}'.format(i,reward_total))
+        print('Episode: {}, total rewards:{}; total steps:{}'.format(i,reward_total,steps_survived))
         if heardEnter():
             break
     
@@ -136,6 +142,7 @@ def train(IP,is_simulation=True,starting_qtable_filename=None, all_collisions_fi
     
     np.save('tables/all_rewards',all_rewards)
     np.save('tables/all_collisions',all_collisions)
+    np.save('tables/all_steps_survived',all_steps_survived)
     rob.stop_world()
     
     
