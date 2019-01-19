@@ -143,7 +143,7 @@ def train(IP,is_simulation=True,
             
             
         #Append current simulation statistics to total statistics
-        all_collisions.append(0 if collision else 1)
+        all_collisions.append(1 if collision else 0)
         all_rewards.append(reward_total)
         all_steps_survived.append(steps_survived)
         furthest_distance.append(distance_max)
