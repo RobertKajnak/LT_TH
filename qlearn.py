@@ -11,12 +11,6 @@ import random
 import select
 import sys
 
-def keypressed():
-    i,_,_ = select.select([sys.stdin],[],[],0.0001)
-    if i:
-        return True
-    else:
-        return False
 def heardEnter():
     i,o,e = select.select([sys.stdin],[],[],0.0001)
     for s in i:
@@ -43,20 +37,20 @@ def get_reward(action, last_action, collision):
         return rewards[action]
         
 
-def train(starting_qtable_filename=None, all_collisions_filename=None,all_rewards_filename=None):
+def train(IP,is_simulation=True,starting_qtable_filename=None, all_collisions_filename=None,all_rewards_filename=None):
     '''
     params:
         starting_episode==None starts from scratch
         
     '''
-    rob = robobo.SimulationRobobo().connect(address='192.168.178.24', port=19997)
-    #rob = robobo.SimulationRobobo().connect(address='196.168.137.1', port=19997)
-    #rob = robobo.SimulationRobobo().connect(address='192.168.1.15', port=19997)
-    #rob = robobo.HardwareRobobo(camera=True).connect(address="192.168.1.15")
+    if is_simulation:
+        rob = robobo.SimulationRobobo().connect(address=IP, port=19997)
+    else:
+        rob = robobo.HardwareRobobo(camera=True).connect(address=IP)
 
-    move = motion.Motion(rob,True,speed=30,time=500)
+    move = motion.Motion(rob,is_simulation,speed=30,time=500)
     
-    sens = irsensors.Sensors(rob,True)
+    sens = irsensors.Sensors(rob,is_simulation)
     
     """Training the agent"""
     
@@ -75,7 +69,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
     all_collisions = np.load(all_collisions_filename) if all_collisions_filename else []
     all_rewards = np.load(all_rewards_filename) if all_rewards_filename else []
     
-    for i in range(1, 1000):
+    for i in range(1, 300):
         #state = env.reset()
         rob.stop_world()
         time.sleep(3)
@@ -115,7 +109,7 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
             reward = get_reward(action, prev_action,collision)
                     
             
-            done = True if (rob.getTime() > 90000 or collisions>=2) else False 
+            done = True if (rob.getTime() > 60000 or collisions>=1) else False 
                 
             reward_total+=reward
             
@@ -145,13 +139,14 @@ def train(starting_qtable_filename=None, all_collisions_filename=None,all_reward
     rob.stop_world()
     
     
-def test(q_table_filename):
-    #rob = robobo.SimulationRobobo().connect(address='192.168.178.10', port=19997)
-    #rob = robobo.SimulationRobobo().connect(address='192.168.1.6', port=19997)
-    rob = robobo.HardwareRobobo(camera=True).connect(address="192.168.1.13")
-    move = motion.Motion(rob,False,speed=30,time=500)
+def test(q_table_filename,IP,is_simulation=False):
+    if is_simulation:
+        rob = robobo.SimulationRobobo().connect(address='192.168.178.10', port=19997)
+    else:
+        rob = robobo.HardwareRobobo(camera=True).connect(address="192.168.1.13")
+    move = motion.Motion(rob,is_simulation,speed=30,time=500)
    
-    sens = irsensors.Sensors(rob,False)
+    sens = irsensors.Sensors(rob,is_simulation)
     
     q_table = np.load(q_table_filename)
     
@@ -185,5 +180,6 @@ def test(q_table_filename):
 
         
 if __name__ == "__main__":
-    train()
+    #'192.168.1.15'  '196.168.137.1'
+    train('192.168.178.10')
     #test('q_table590_nofollow.npy')
