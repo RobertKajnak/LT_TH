@@ -15,6 +15,7 @@ def heardEnter():
     i,o,e = select.select([sys.stdin],[],[],0.0001)
     for s in i:
         if s == sys.stdin:
+            sys.stdin.readline()
             return True
     return False
 
@@ -83,7 +84,7 @@ def train(IP,is_simulation=True,
         rob.play_simulation()
     
         #initialize state variables
-        next_state, collisions, reward = 0,0,0
+        state, collisions, reward = 0,0,0
         action = 0
         done = False
         
@@ -95,36 +96,36 @@ def train(IP,is_simulation=True,
         
         while not done:
             #save last states
-            prev_action = action
-            state = next_state
+            action_prev = action
+            state_prev = state
             
             #choose either best or random action
             if random.uniform(0, 1) < epsilon:
                 action = random.choice(range(7))
             else:
-                action = np.argmax(q_table[state]) # Exploit learned values
+                action = np.argmax(q_table[state_prev]) # Exploit learned values
             
             # so that it doesn't jump around
-            if (prev_action>=5 and action<5) or (prev_action<5 and action>5):
+            if (action_prev>=5 and action<5) or (action_prev<5 and action>5):
                 time.sleep(1.5)
                 
             #perform action, read sensors and calculate state
             move.move(action)
-            next_state = 0
+            state = 0
             sens_val, collision = sens.binary()
             for j in range(8):
-                next_state+=sens_val[j]*2**(j)
-            next_state+=256*prev_action
+                state+=sens_val[j]*2**(j)
+            state+=256*action_prev
             
             #calculate reward
-            reward = get_reward(action, prev_action,collision)             
+            reward = get_reward(action, action_prev,collision)             
             
             #update Q-table
-            old_value = q_table[state, action]
-            next_max = np.max(q_table[next_state])
+            old_value = q_table[state_prev, action]
+            next_max = np.max(q_table[state])
             
             new_value = (1 - alpha) * old_value + alpha * (reward + gamma * next_max)
-            q_table[state, action] = new_value
+            q_table[state_prev, action] = new_value
        
             
             #calculate statistics for current step
@@ -164,6 +165,8 @@ def train(IP,is_simulation=True,
     np.save('tables/all_rewards',all_rewards)
     np.save('tables/all_collisions',all_collisions)
     np.save('tables/all_steps_survived',all_steps_survived)
+    np.save('tables/a_furthest_distance',furthest_distance)
+    np.save('tables/all_positions',all_positions)
     rob.stop_world()
     
     
