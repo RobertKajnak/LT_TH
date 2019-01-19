@@ -34,9 +34,9 @@ def get_reward(action, last_action, collision):
     if collision:
         return -50;
     #going back and forwards is not a proper movement
-    elif (last_action<=1 and action==5) or ((last_action==2 or last_action==0) and action==6) or \
-       (last_action==5 and action<=1) or (last_action==6 and (action==2 or action==0)):
-           return -2
+    #elif (last_action<=1 and action==5) or ((last_action==2 or last_action==0) and action==6) or \
+    #   (last_action==5 and action<=1) or (last_action==6 and (action==2 or action==0)):
+    #       return -2
     else:
         return rewards[action]
         
@@ -64,6 +64,7 @@ def train(IP,is_simulation=True,
         q_table = np.zeros([2**8*7, 7])
 
     # Hyperparameters
+    # Add adaptive parameters
     alpha = 0.1
     gamma = 0.6
     epsilon = 0.1

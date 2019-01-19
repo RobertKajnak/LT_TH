@@ -20,10 +20,10 @@ class Sensors:
                 ]
         else:
             self.touching = 5
-            self.thresholds =  [[0.01,0.18] for i in range(3)]+ \
-                                [[0.05,0.18] for i in range(2)] +\
-                                [[0.01,0.18] for i in range(1)] +\
-                                [[0.05,0.18] for i in range(2)]
+            self.thresholds =  [[0.01,0.17] for i in range(3)]+ \
+                                [[0.05,0.17] for i in range(2)] +\
+                                [[0.01,0.17] for i in range(1)] +\
+                                [[0.05,0.17] for i in range(2)]
                 
     def set_sensor_baseline(self):
         cont = self.continuous()
