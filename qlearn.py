@@ -40,10 +40,24 @@ def get_reward(action, last_action, collision):
     else:
         return rewards[action]
         
+class stats_filenames:
+    def __init__(self,starting_qtable_filename=None, all_collisions_filename=None,
+                 all_rewards_filename=None, steps_survived_filename = None, 
+                 furthest_distance_filename=None,all_positions_filename=None,
+                 all_alphas_filename=None, all_epsilons_filename=None):
+        self.starting_qtable_filename = starting_qtable_filename
+        self.all_collisions_filename = all_collisions_filename
+        self.all_rewards_filename = all_rewards_filename
+        self.steps_survived_filename = steps_survived_filename
+        self.furthest_distance_filename = furthest_distance_filename
+        self.all_positions_filename = all_positions_filename
+        self.all_alphas_filename = all_alphas_filename
+        self.all_epsilons_filename =  all_epsilons_filename
 
-def train(IP,is_simulation=True,
-          starting_qtable_filename=None, all_collisions_filename=None,all_rewards_filename=None,
-          steps_survived_filename = None, furthest_distance_filename=None,all_positions_filename=None):
+def _load_init(filename):
+    return np.load(filename) if filename else []
+
+def train(IP,is_simulation=True,filenames=None):
     '''
     params:
         starting_episode==None starts from scratch
@@ -57,9 +71,15 @@ def train(IP,is_simulation=True,
     move = motion.Motion(rob,is_simulation,speed=25,time=500)
     sens = irsensors.Sensors(rob,is_simulation)
    
+    #initialize stats
+    if filenames is None:
+        fn = stats_filenames()
+    else:
+        fn = filenames
+    
     #initialize Q-table
-    if starting_qtable_filename:
-        q_table = np.load(starting_qtable_filename)
+    if fn.starting_qtable_filename:
+        q_table = np.load(fn.starting_qtable_filename)
     else:
         q_table = np.zeros([2**8*7, 7])
 
@@ -69,22 +89,24 @@ def train(IP,is_simulation=True,
     gamma = 0.75 #future reward
     epsilon = 0.3 #exploration
     
-    time_limit = 90000
+    time_limit = 60000
     max_iterations= 300
     halving = max_iterations/12
     
     # For plotting metrics
-    all_collisions = np.load(all_collisions_filename) if all_collisions_filename else []
-    all_rewards = np.load(all_rewards_filename) if all_rewards_filename else []
-    all_steps_survived = np.load(steps_survived_filename) if steps_survived_filename else []
-    furthest_distance = np.load(furthest_distance_filename) if furthest_distance_filename else []
-    all_positions = np.load(all_positions_filename) if all_positions_filename else []
+    all_collisions = _load_init(fn.all_collisions_filename)
+    all_rewards = _load_init(fn.all_rewards_filename)
+    all_steps_survived = _load_init(fn.steps_survived_filename)
+    furthest_distance = _load_init(fn.furthest_distance_filename)
+    all_positions = _load_init(fn.all_positions_filename)
+    all_alphas = _load_init(fn.all_alphas_filename)
+    all_epsilons = _load_init(fn.all_epsilons_filename)
     
     for i in range(0, max_iterations):
         #update hyperparams
         if i%halving==0 and i>0:
             epsilon/=2
-        alpha = alpha_base*(0.1+float(max_iterations-i)/max_iterations)
+        alpha = alpha_base*(0.03+float(max_iterations-i)/max_iterations)
         print('a={:.3f}, e={:.3f}'.format(alpha,epsilon))
 
         #initialize World
@@ -157,6 +179,8 @@ def train(IP,is_simulation=True,
         all_steps_survived.append(steps_survived)
         furthest_distance.append(distance_max)
         all_positions.append(position_list)
+        all_alphas.append(alpha)
+        all_epsilons.append(epsilon)
         
         #save controller
         np.save('tables/q_table{}'.format(i),q_table)
@@ -176,6 +200,8 @@ def train(IP,is_simulation=True,
     np.save('tables/all_steps_survived',all_steps_survived)
     np.save('tables/a_furthest_distance',furthest_distance)
     np.save('tables/all_positions',all_positions)
+    np.save('tables/all_alphas',all_alphas)
+    np.save('tables/all_epsilons',all_epsilons)
     rob.stop_world()
     
     

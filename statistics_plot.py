@@ -52,7 +52,9 @@ class stats_plotter:
                 plt.plot(x, b + m * x, '-', linewidth=3)
             
             if not Y is self.colls:
-                idx_best = np.argmax(Y)
+                #ignore the initial random successes
+                Y_offset = int(Y.shape[0]/3)
+                idx_best = np.argmax(Y[Y_offset:])+Y_offset
                 val_best = np.max(y)
                 ax.annotate('best episode: '+ str(idx_best), 
                     xy=(idx_best, val_best), 
