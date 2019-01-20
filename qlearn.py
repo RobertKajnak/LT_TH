@@ -4,7 +4,7 @@ import time
 import robobo
 #import cv2
 import numpy as np
-#import vision
+import vision
 import motion
 import irsensors
 import random
@@ -70,7 +70,8 @@ def train(IP,is_simulation=True,filenames=None):
         rob = robobo.HardwareRobobo(camera=True).connect(address=IP)
     move = motion.Motion(rob,is_simulation,speed=25,time=500)
     sens = irsensors.Sensors(rob,is_simulation)
-   
+    see = vision.Vision(rob,is_simulation)
+    
     #initialize stats
     if filenames is None:
         fn = stats_filenames()
@@ -87,9 +88,9 @@ def train(IP,is_simulation=True,filenames=None):
     # Add adaptive parameters
     alpha_base = 0.4 #learning rate
     gamma = 0.75 #future reward
-    epsilon = 0.3 #exploration
+    epsilon = 1 #exploration
     
-    time_limit = 60000
+    time_limit = 160000
     max_iterations= 300
     halving = max_iterations/12
     
@@ -108,7 +109,7 @@ def train(IP,is_simulation=True,filenames=None):
             epsilon/=2
         alpha = alpha_base*(0.03+float(max_iterations-i)/max_iterations)
         print('a={:.3f}, e={:.3f}'.format(alpha,epsilon))
-
+        
         #initialize World
         rob.stop_world()
         time.sleep(3)
@@ -144,6 +145,8 @@ def train(IP,is_simulation=True,filenames=None):
             move.move(action)
             state = 0
             sens_val, collision = sens.binary()
+            photo = see.color_per_area()
+            print(photo)
             for j in range(8):
                 state+=sens_val[j]*2**(j)
             state+=256*action_prev
@@ -208,9 +211,9 @@ def train(IP,is_simulation=True,filenames=None):
 def test(q_table_filename,IP,is_simulation=False):
     #initialize robot
     if is_simulation:
-        rob = robobo.SimulationRobobo().connect(address='192.168.178.10', port=19997)
+        rob = robobo.SimulationRobobo().connect(address=IP, port=19997)
     else:
-        rob = robobo.HardwareRobobo(camera=True).connect(address="192.168.1.13")
+        rob = robobo.HardwareRobobo(camera=True).connect(address=IP)
     move = motion.Motion(rob,is_simulation,speed=30,time=500)
     sens = irsensors.Sensors(rob,is_simulation)
 
@@ -254,5 +257,5 @@ def test(q_table_filename,IP,is_simulation=False):
         
 if __name__ == "__main__":
     #'192.168.1.15'  '196.168.137.1'
-    train('192.168.178.10')
+    train('192.168.1.15')
     #test('q_table590_nofollow.npy')

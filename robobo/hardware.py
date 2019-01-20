@@ -156,3 +156,9 @@ class HardwareRobobo(Robobo):
     def sleep(self, seconds):
         self._set_env()
         rospy.sleep(seconds)
+    
+    def set_controller(self, controller):
+        '''
+        The controller needs to take an array of 8 sensors and 
+        '''
+        self._IRsub = rospy.Subscriber("robot/irs", IRs, controller)

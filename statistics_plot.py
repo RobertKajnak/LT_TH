@@ -74,15 +74,15 @@ class stats_plotter:
             plt.arrow(X[i],Y[i],X[i+1]-X[i],Y[i+1]-Y[i],head_width=0.008,length_includes_head=True)
             
         
-    def plot_all(self):
+    def plot_all(self, mavg=30):
         self.fig = plt.figure(num=None, figsize=(5*self.ncols, 3*self.nrows), dpi=80, facecolor='w', edgecolor='black')
         plt.subplots_adjust( wspace=0.3, hspace=0.5)
         
         self._current_sp_index=1
-        self._plot_single(self.dists,'Max Distance Covered')
+        self._plot_single(self.dists,'Max Distance Covered',mavg=mavg)
         self._plot_single(self.colls,'End by collision?',mavg=0)
-        self._plot_single(self.rews,'Rewards/episode')
-        self._plot_single(self.steps,'Steps/episode')
+        self._plot_single(self.rews,'Rewards/episode',mavg=mavg)
+        self._plot_single(self.steps,'Steps/episode',mavg=mavg)
         
         plt.show()
         
