@@ -52,7 +52,7 @@ class stats_plotter:
                 plt.plot(x, b + m * x, '-', linewidth=3)
             
             if not Y is self.colls:
-                idx_best = np.argmax(y)
+                idx_best = np.argmax(Y)
                 val_best = np.max(y)
                 ax.annotate('best episode: '+ str(idx_best), 
                     xy=(idx_best, val_best), 
