@@ -2,17 +2,27 @@ import numpy as np
 from collections import Counter
 
 class Vision:
-    colors={'b':(0,0,0),
+
+    def __init__(self,robot,is_simulation=True,area_size=(4,3), downsampling_rate = 10):
+        self.rob = robot
+        self.area_size = area_size
+        self.downsampling_rate = downsampling_rate
+        
+        if is_simulation:
+            self.colors={'b':(0,0,0),
                 'w':(255,255,255),
                 'R':(255,0,0),
                 'G':(0,255,0),
                 'B':(0,0,255),
                 'brown':(150, 75, 0)}
+        else:
+            self.colors={'b':(0,0,0),
+                'w':(255,255,255),
+                'R':(0,0,255),
+                'G':(0,255,0),
+                'B':(255,0,0),
+                'brown':(0, 75, 150)}
     
-    def __init__(self,robot,is_simulation=True,area_size=(4,3), downsampling_rate = 10):
-        self.rob = robot
-        self.area_size = area_size
-        self.downsampling_rate = downsampling_rate
     def _cdist(self,a,b):
         return np.sqrt((a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2)
         #return np.linalg.norm(a-b)
@@ -31,8 +41,8 @@ class Vision:
         return []
     
     
-    def color_per_area(self,image):
-        #image = self.rob.get_image_front()
+    def color_per_area(self):
+        image = self.rob.get_image_front()
         w = image.shape[0]
         h = image.shape[1]
         #print(image.shape)
@@ -47,7 +57,7 @@ class Vision:
             xd+=1
         
         zones = np.empty(self.area_size,dtype=np.unicode)
-        fbg = lambda x: x!='b' and x!='w' #skip the background colors
+        fbg = lambda x: True#x!='b' and x!='w' #skip the background colors
         #most common without filtering: Counter([Counter(line).most_common()[0][0] for line in downsampled]).most_common()[0][0]
         for i in range(self.area_size[0]):
             for j in range(self.area_size[1]):
@@ -57,7 +67,7 @@ class Vision:
                 lines = [y[0] if y!=[] else 'b' for y in [list(filter(fbg,x)) for x in [[l[0] for l in Counter(line).most_common()] for line in sm ]]]
                 zones[i][j] = [y[0] if y!=[] else 'b' for y in [list(filter(fbg,[x[0] for x in Counter(lines).most_common()]))]][0]
         
-        print(downsampled)
+        
         return zones
     
     
