@@ -31,16 +31,13 @@ class Vision:
         return []
     
     
-    def color_per_area(self):
-        image = self.rob.get_image_front()
+    def color_per_area(self,image):
+        #image = self.rob.get_image_front()
         w = image.shape[0]
         h = image.shape[1]
         #print(image.shape)
         
-        downsampled = np.empty((np.int(w/self.downsampling_rate)+1,np.int(h/self.downsampling_rate)+1),dtype=np.unicode)
-        #print(downsampled.shape)
-        #print(w)
-        #print(h)
+        downsampled = np.empty((np.int(h/self.downsampling_rate),np.int(w/self.downsampling_rate)),dtype=np.unicode)
         xd=0
         for x in np.arange(0,h,self.downsampling_rate):
             yd=0
@@ -60,10 +57,7 @@ class Vision:
                 lines = [y[0] if y!=[] else 'b' for y in [list(filter(fbg,x)) for x in [[l[0] for l in Counter(line).most_common()] for line in sm ]]]
                 zones[i][j] = [y[0] if y!=[] else 'b' for y in [list(filter(fbg,[x[0] for x in Counter(lines).most_common()]))]][0]
         
-        
-    
-        #zones[area_size[0]*h/x,area_size[1]*w/y]
-        #print(downsampled)
+        print(downsampled)
         return zones
     
     
