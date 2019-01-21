@@ -47,7 +47,9 @@ class Vision:
         h = image.shape[1]
         #print(image.shape)
         
-        downsampled = np.empty((np.int(h/self.downsampling_rate),np.int(w/self.downsampling_rate)),dtype=np.unicode)
+        downsampled = np.empty((np.int((np.floor(h/self.downsampling_rate)))+1,
+                                np.int(np.floor(w/self.downsampling_rate))+1),
+                                dtype=np.unicode)
         xd=0
         for x in np.arange(0,h,self.downsampling_rate):
             yd=0
