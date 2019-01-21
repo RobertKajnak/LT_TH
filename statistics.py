@@ -4,7 +4,7 @@ Created on Mon Jan 21 08:24:46 2019
 
 @author: Hesiris
 """
-import pickle
+import json
 
 class Statistics:
     def __init__(self, filename = None):
@@ -16,12 +16,12 @@ class Statistics:
             self.y_labels = {}
         else:        
             f = open(filename,"rb")
-            ps = pickle.load(f)
-            self.const_var = ps.const_var
-            self.cont_var = ps.cont_var
-            self.paths = ps.cont_var
-            self.x_labels = ps.x_labels
-            self.y_labels = ps.y_labels
+            ps = json.load(f)
+            self.cont_var = ps[0]
+            self.const_var = ps[1]
+            self.paths = ps[2]
+            self.x_labels = ps[3]
+            self.y_labels = ps[4]
             
     
     def add_continuous_point(self,var_name, point_value):
@@ -64,7 +64,9 @@ class Statistics:
         
         
     def save(self,filename):
-        pickle.dump(self, open(filename, "wb"))
+        json.dump([self.cont_var ,self.const_var ,self.paths ,
+            self.x_labels,
+            self.y_labels], open(filename, "w"))
 
 
 import numpy as np
@@ -76,8 +78,7 @@ def dist(a,b):
 
 class Statistics_plotter:
     def __init__(self,filename,plot_trend = False, mavg_window_size=1):
-        f = open(filename,"rb")
-        self.stats = pickle.load(f)
+        self.stats = Statistics(filename)#json.load
         
         cont = len(self.stats.cont_var.keys())
         
@@ -90,20 +91,19 @@ class Statistics_plotter:
             self.trends[k] = plot_trend
             self.mavg_windows[k] = mavg_window_size
     
-    def _plot_single(self,Y,y_label,x_label, mavg_window=30,show_trend = False):
+    def _plot_single(self,Y,title,y_label,x_label, mavg_window=30,show_trend = False):
         if not Y is None:
             Y = np.asarray(Y)
             ax = self.fig.add_subplot(self.nrows,self.ncols,self._current_sp_index)
             ax.set_xlabel(x_label, fontsize=12)
             ax.set_ylabel(y_label, fontsize=12)
-            
+            plt.title(title)
             if mavg_window==1:
                 y = Y
             else:
                 y = np.asarray([np.mean(Y[i:i+mavg_window-1]) for i in range(Y.shape[0]-mavg_window)])
-            x = range(y.shape[0])
+            x = np.asarray(range(y.shape[0]))
             plt.plot(x, y,'k', linewidth=3)
-            
             if show_trend:
                 b, m = polyfit(x, y, 1)
                 plt.plot(x, b + m * x, '-', linewidth=3)
@@ -123,9 +123,8 @@ class Statistics_plotter:
     def plot_path(self,index, category_name = ''):
         X = [v[0] for v in self.stats.paths[category_name][index]]
         Y = [v[1] for v in self.stats.paths[category_name][index]]
+        plt.figure()
         plt.scatter(X,Y,alpha=0)
-        #plt.ylim(np.min(Y),np.max(Y))
-        #plt.xlim(np.min(X),np.max(X))
         plt.axes().set_aspect('equal')
         plt.title(category_name + ' Path ' + str(index))
         plt.plot(X[0],Y[0],'gs',markersize =15)
@@ -188,11 +187,7 @@ class Statistics_plotter:
                 mavg_window = self.mavg_windows[k]
             else:
                 mavg_window = 1
-            self._plot_single(self.stats.cont_var[k],y_l,x_l,mavg_window,self.trends[k])
-#        self._plot_single(self.dists,'Max Distance Covered',mavg_window=mavg_window)
-#        self._plot_single(self.colls,'End by collision?',mavg_window=0)
-#        self._plot_single(self.rews,'Rewards/episode',mavg_window=mavg_window)
-#        self._plot_single(self.steps,'Steps/episode',mavg_window=mavg_window)
+            self._plot_single(self.stats.cont_var[k],k,y_l,x_l,mavg_window,self.trends[k])
         
         plt.show()
         
