@@ -7,12 +7,22 @@ Created on Mon Jan 21 08:24:46 2019
 import pickle
 
 class Statistics:
-    def __init__(self):
-        self.cont_var = {}
-        self.const_var = {}
-        self.paths = {}
-        self.x_labels = {}
-        self.y_labels = {}
+    def __init__(self, filename = None):
+        if filename is None:
+            self.cont_var = {}
+            self.const_var = {}
+            self.paths = {}
+            self.x_labels = {}
+            self.y_labels = {}
+        else:        
+            f = open(filename,"rb")
+            ps = pickle.load(f)
+            self.const_var = ps.const_var
+            self.cont_var = ps.cont_var
+            self.paths = ps.cont_var
+            self.x_labels = ps.x_labels
+            self.y_labels = ps.y_labels
+            
     
     def add_continuous_point(self,var_name, point_value):
         if var_name in self.cont_var:
@@ -114,12 +124,29 @@ class Statistics_plotter:
         X = [v[0] for v in self.stats.paths[category_name][index]]
         Y = [v[1] for v in self.stats.paths[category_name][index]]
         plt.scatter(X,Y,alpha=0)
+        #plt.ylim(np.min(Y),np.max(Y))
+        #plt.xlim(np.min(X),np.max(X))
+        plt.axes().set_aspect('equal')
         plt.title(category_name + ' Path ' + str(index))
         plt.plot(X[0],Y[0],'gs',markersize =15)
         plt.plot(X[-1],Y[-1],'r^',markersize =15)
         
+        #calculate arrow head dimesnions
+        left,right = plt.ylim()
+        hw0 = (right-left)/6.0
+        
         for i in range(len(X)-1):
-            plt.arrow(X[i],Y[i],X[i+1]-X[i],Y[i+1]-Y[i],head_width=0.008,length_includes_head=True)
+            if i == len(X)-2:
+                hw=0
+                hl=0
+            else:
+                d = dist([X[i],Y[i]],[X[i+1],Y[i+1]])
+                hw = hw0 * d/float(right-left)
+                hl = hw
+                #hl = np.abs(X[i+1]-X[i])/5.0
+            plt.arrow(X[i],Y[i],X[i+1]-X[i],Y[i+1]-Y[i],
+                      head_width=hw, head_length=hl,
+                      length_includes_head=True)
             
     def set_xlabel(self,var_name, label):
         self.stats.set_xlabel(var_name,label)
@@ -222,7 +249,7 @@ if __name__ == '__main__':
     ss.plot_all()
     
     #Let's also plot a path
-    ss.plot_path(2)
+    ss.plot_path(0)
     
     
     
