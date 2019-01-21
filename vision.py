@@ -59,7 +59,7 @@ class Vision:
             xd+=1
         
         zones = np.empty(self.area_size,dtype=np.unicode)
-        fbg = lambda x: True#x!='b' and x!='w' #skip the background colors
+        fbg = lambda x: x!='b' and x!='w' #skip the background colors
         #most common without filtering: Counter([Counter(line).most_common()[0][0] for line in downsampled]).most_common()[0][0]
         for i in range(self.area_size[0]):
             for j in range(self.area_size[1]):
