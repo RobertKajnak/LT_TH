@@ -2,7 +2,7 @@
 from __future__ import print_function
 import time
 import robobo
-#import cv2
+import cv2
 import numpy as np
 import vision
 import motion
@@ -10,6 +10,7 @@ import irsensors
 import random
 import select
 import sys
+import statistics
 
 def heardEnter():
     i,o,e = select.select([sys.stdin],[],[],0.0001)
@@ -30,34 +31,24 @@ rewards = {0:25,
            5:2,
            6:2}
 
-def get_reward(action, last_action, collision):
+def get_reward(action,vision, food_eaten_increased, collision):
+    if food_eaten_increased:
+        print(vision)
+        return 150;
     if collision:
-        return -80;
+        return -90;
     #going back and forwards is not a proper movement
     #elif (last_action<=1 and action==5) or ((last_action==2 or last_action==0) and action==6) or \
     #   (last_action==5 and action<=1) or (last_action==6 and (action==2 or action==0)):
     #       return -2
+    elif np.any(vision) and action<=2:
+        return rewards[action]*3
     else:
         return rewards[action]
         
-class stats_filenames:
-    def __init__(self,starting_qtable_filename=None, all_collisions_filename=None,
-                 all_rewards_filename=None, steps_survived_filename = None, 
-                 furthest_distance_filename=None,all_positions_filename=None,
-                 all_alphas_filename=None, all_epsilons_filename=None):
-        self.starting_qtable_filename = starting_qtable_filename
-        self.all_collisions_filename = all_collisions_filename
-        self.all_rewards_filename = all_rewards_filename
-        self.steps_survived_filename = steps_survived_filename
-        self.furthest_distance_filename = furthest_distance_filename
-        self.all_positions_filename = all_positions_filename
-        self.all_alphas_filename = all_alphas_filename
-        self.all_epsilons_filename =  all_epsilons_filename
 
-def _load_init(filename):
-    return np.load(filename) if filename else []
 
-def train(IP,is_simulation=True,filenames=None):
+def train(IP,is_simulation=True,starting_qtable_filename=None,stats_filename=None):
     '''
     params:
         starting_episode==None starts from scratch
@@ -70,38 +61,37 @@ def train(IP,is_simulation=True,filenames=None):
         rob = robobo.HardwareRobobo(camera=True).connect(address=IP)
     move = motion.Motion(rob,is_simulation,speed=25,time=500)
     sens = irsensors.Sensors(rob,is_simulation)
-    see = vision.Vision(rob,is_simulation)
+    see = vision.Vision(rob,is_simulation,(1,2),downsampling_rate=3)
+    
+    #set phone position:
+    rob.set_phone_tilt(0.4, 10)
     
     #initialize stats
-    if filenames is None:
-        fn = stats_filenames()
+    if stats_filename is None:
+        stats = statistics.Statistics()
     else:
-        fn = filenames
+        stats = statistics.Statistics(stats_filename)
     
     #initialize Q-table
-    if fn.starting_qtable_filename:
-        q_table = np.load(fn.starting_qtable_filename)
+    if starting_qtable_filename:
+        q_table = np.load(starting_qtable_filename)
     else:
-        q_table = np.zeros([2**8*7, 7])
+        q_table = np.zeros([2**8*7*2**2, 7])
 
     # Hyperparameters
     # Add adaptive parameters
     alpha_base = 0.4 #learning rate
     gamma = 0.75 #future reward
-    epsilon = 1 #exploration
+    epsilon = 0.4 #exploration
     
-    time_limit = 160000
-    max_iterations= 300
+    time_limit = 120000
+    max_iterations= 1200
     halving = max_iterations/12
+        
+    target_color = 'G'
     
     # For plotting metrics
-    all_collisions = _load_init(fn.all_collisions_filename)
-    all_rewards = _load_init(fn.all_rewards_filename)
-    all_steps_survived = _load_init(fn.steps_survived_filename)
-    furthest_distance = _load_init(fn.furthest_distance_filename)
-    all_positions = _load_init(fn.all_positions_filename)
-    all_alphas = _load_init(fn.all_alphas_filename)
-    all_epsilons = _load_init(fn.all_epsilons_filename)
+    stats.set_constant('gamma',gamma)   
     
     for i in range(0, max_iterations):
         #update hyperparams
@@ -122,9 +112,11 @@ def train(IP,is_simulation=True,filenames=None):
         
         #initialize statistics
         position_start = rob.position()
+        food_eaten = rob.collected_food()
         reward_total,steps_survived,distance_max =  0, -1, 0
+        y_max,x_max,y_min,x_min = position_start[1],position_start[0],position_start[1],position_start[0]
         position_current = position_start
-        position_list = []
+        stats.add_path()
         
         while not done:
             #save last states
@@ -139,20 +131,27 @@ def train(IP,is_simulation=True,filenames=None):
             
             # so that it doesn't jump around
             if (action_prev>=5 and action<5) or (action_prev<5 and action>5):
-                time.sleep(1.5)
+                time.sleep(1.5/8)
                 
-            #perform action, read sensors and calculate state
+            #perform action, read sensors
             move.move(action)
             state = 0
             sens_val, collision = sens.binary()
             photo = see.color_per_area()
-            print(photo)
+            visual_object = [1 if pixel==target_color else 0 for pixel in photo[0]]
+            
+            food_eaten_last = food_eaten
+            food_eaten = rob.collected_food()
+            
+            #calculate state
             for j in range(8):
                 state+=sens_val[j]*2**(j)
-            state+=256*action_prev
+            state+=(2**8)*action_prev
+            for j in range(2):
+                state+= (2**8)*7* 2**j * visual_object[j]
             
             #calculate reward
-            reward = get_reward(action, action_prev,collision)             
+            reward = get_reward(action, visual_object,food_eaten-food_eaten_last,collision)             
             
             #update Q-table
             old_value = q_table[state_prev, action]
@@ -167,8 +166,12 @@ def train(IP,is_simulation=True,filenames=None):
             steps_survived+=1
             
             position_current = rob.position()
-            position_list.append(position_current)
+            stats.add_point_to_path(position_current)
             distance_max = np.max((distance_max,dist(position_current,position_start)))
+            y_min = np.min((y_min,position_current[1]))
+            y_max = np.max((y_max,position_current[1]))           
+            x_min = np.min((x_min,position_current[0]))
+            x_max = np.max((x_max,position_current[0]))
             
             collisions += int(collision)
             
@@ -177,19 +180,26 @@ def train(IP,is_simulation=True,filenames=None):
             
             
         #Append current simulation statistics to total statistics
-        all_collisions.append(collisions)
-        all_rewards.append(reward_total)
-        all_steps_survived.append(steps_survived)
-        furthest_distance.append(distance_max)
-        all_positions.append(position_list)
-        all_alphas.append(alpha)
-        all_epsilons.append(epsilon)
-        
+        stats.add_continuous_point('Collisions',collisions)
+        stats.add_continuous_point('Total Reward',reward_total)
+        stats.add_continuous_point('Steps Survived',steps_survived)
+        stats.add_continuous_point('Max Distance Achieved',distance_max)
+        stats.add_continuous_point('Alpa',alpha)
+        stats.add_continuous_point('Epsiolon',epsilon)
+        stats.add_continuous_point('Food Eaten',food_eaten)
+        max_area = (y_max-y_min)*(x_max-x_min)
+        stats.add_continuous_point('Widest Area explored',max_area)
+        for k in ['Collisions','Total Reward','Steps Survived',
+                  'Max Distance Achieved','Alpa','Epsiolon','Widest Area explored',
+                  'Food Eaten']:
+            stats.set_xlabel(k,'Episode')
+        stats.set_ylabel('Max Distance Achieved','m')
+        stats.set_ylabel('Widest Area explored','m^2')
         #save controller
         np.save('tables/q_table{}'.format(i),q_table)
         
         #Display current progress
-        print('Episode: {}, total rewards:{}, total steps:{}, max distance:{:.2f}'.format(i,reward_total,steps_survived,distance_max))
+        print('Episode: {}, total rewards:{}, total steps:{}, max area:{:.2f}'.format(i,reward_total,steps_survived,max_area))
         
         #check for termination by user
         if heardEnter():
@@ -198,13 +208,7 @@ def train(IP,is_simulation=True,filenames=None):
     print("Training finished.\n")
     
     #save statistics
-    np.save('tables/all_rewards',all_rewards)
-    np.save('tables/all_collisions',all_collisions)
-    np.save('tables/all_steps_survived',all_steps_survived)
-    np.save('tables/a_furthest_distance',furthest_distance)
-    np.save('tables/all_positions',all_positions)
-    np.save('tables/all_alphas',all_alphas)
-    np.save('tables/all_epsilons',all_epsilons)
+    stats.save('tables/all_stats.pickle')
     rob.stop_world()
     
     
@@ -213,10 +217,17 @@ def test(q_table_filename,IP,is_simulation=False):
     if is_simulation:
         rob = robobo.SimulationRobobo().connect(address=IP, port=19997)
     else:
+        print('Connecting...')
         rob = robobo.HardwareRobobo(camera=True).connect(address=IP)
+        print('Connected')
+        
+        
+    rob.set_phone_tilt(0.4, 10)
+    
     move = motion.Motion(rob,is_simulation,speed=30,time=500)
     sens = irsensors.Sensors(rob,is_simulation)
-
+    see = vision.Vision(rob, False,(5,5),3)
+    
     #load Q-table    
     q_table = np.load(q_table_filename)
     
@@ -225,6 +236,8 @@ def test(q_table_filename,IP,is_simulation=False):
 
     init = False
     
+    img_counter = 0
+    print('Starting action. Press Enter to stop')
     while not heardEnter():
         state = 0
         sens_val, collision = sens.binary()
@@ -234,6 +247,11 @@ def test(q_table_filename,IP,is_simulation=False):
         
         #print sensor values for debug
         print(sens_val)
+        #print(sens.continuous())
+        print(see.color_per_area())
+        image = rob.get_image_front()
+        cv2.imwrite("test_pictures{}.png".format(img_counter),image)
+        img_counter+=1
         
         #Initialize sensors to base values
         if not is_simulation and not init:
@@ -257,5 +275,5 @@ def test(q_table_filename,IP,is_simulation=False):
         
 if __name__ == "__main__":
     #'192.168.1.15'  '196.168.137.1'
-    train('192.168.1.15')
-    #test('q_table590_nofollow.npy')
+    train('192.168.178.10')
+    #test('q_table185_adaptive_2.npy','192.168.1.13')
