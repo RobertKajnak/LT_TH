@@ -33,8 +33,7 @@ rewards = {0:25,
 
 def get_reward(action,vision, food_eaten_increased, collision):
     if food_eaten_increased:
-        print(vision)
-        return 150;
+        return 200;
     if collision:
         return -90;
     #going back and forwards is not a proper movement
@@ -81,12 +80,12 @@ def train(IP,is_simulation=True,starting_qtable_filename=None,stats_filename=Non
     # Hyperparameters
     # Add adaptive parameters
     alpha_base = 0.4 #learning rate
-    gamma = 0.75 #future reward
+    gamma = 0.7 #future reward
     epsilon = 0.4 #exploration
     
-    time_limit = 120000
-    max_iterations= 1200
-    halving = max_iterations/12
+    time_limit = 500000
+    max_iterations= 900
+    halving = max_iterations/6
         
     target_color = 'G'
     
@@ -173,10 +172,10 @@ def train(IP,is_simulation=True,starting_qtable_filename=None,stats_filename=Non
             x_min = np.min((x_min,position_current[0]))
             x_max = np.max((x_max,position_current[0]))
             
-            collisions += int(collision)
+            collisions += int(collision and (food_eaten==food_eaten_last))
             
             #check for termination criteria            
-            done = True if (rob.getTime() > time_limit or collisions>=2) else False 
+            done = True if (rob.getTime() > time_limit or collisions>=3) else False 
             
             
         #Append current simulation statistics to total statistics
@@ -184,8 +183,8 @@ def train(IP,is_simulation=True,starting_qtable_filename=None,stats_filename=Non
         stats.add_continuous_point('Total Reward',reward_total)
         stats.add_continuous_point('Steps Survived',steps_survived)
         stats.add_continuous_point('Max Distance Achieved',distance_max)
-        stats.add_continuous_point('Alpa',alpha)
-        stats.add_continuous_point('Epsiolon',epsilon)
+        stats.add_continuous_point('Alpha',alpha)
+        stats.add_continuous_point('Epsilon',epsilon)
         stats.add_continuous_point('Food Eaten',food_eaten)
         max_area = (y_max-y_min)*(x_max-x_min)
         stats.add_continuous_point('Widest Area explored',max_area)
@@ -208,7 +207,7 @@ def train(IP,is_simulation=True,starting_qtable_filename=None,stats_filename=Non
     print("Training finished.\n")
     
     #save statistics
-    stats.save('tables/all_stats.pickle')
+    stats.save('tables/all_stats.json')
     rob.stop_world()
     
     
@@ -235,22 +234,36 @@ def test(q_table_filename,IP,is_simulation=False):
         rob.play_simulation()
 
     init = False
+    action = 0
+    action_prev = action
+    target_color = 'G'
     
     img_counter = 0
     print('Starting action. Press Enter to stop')
     while not heardEnter():
         state = 0
         sens_val, collision = sens.binary()
+        
+        photo = see.color_per_area()
+        visual_object = [1 if pixel==target_color else 0 for pixel in photo[0]]
+        
         for j in range(8):
             state+=sens_val[j]*2**(j)
+            
+            #vision
+        state+=(2**8)*action_prev
+        for j in range(2):
+            state+= (2**8)*7* 2**j * visual_object[j]
+    
+        action_prev = action
         action = np.argmax(q_table[state])
         
         #print sensor values for debug
         print(sens_val)
         #print(sens.continuous())
         print(see.color_per_area())
-        image = rob.get_image_front()
-        cv2.imwrite("test_pictures{}.png".format(img_counter),image)
+        #image = rob.get_image_front()
+        #cv2.imwrite("test_pictures{}.png".format(img_counter),image)
         img_counter+=1
         
         #Initialize sensors to base values
@@ -276,4 +289,5 @@ def test(q_table_filename,IP,is_simulation=False):
 if __name__ == "__main__":
     #'192.168.1.15'  '196.168.137.1'
     train('192.168.178.10')
+    #test('q_table552_vision_attempt1.npy','192.168.178.10', is_simulation = True )
     #test('q_table185_adaptive_2.npy','192.168.1.13')
