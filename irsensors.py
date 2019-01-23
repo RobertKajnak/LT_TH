@@ -1,7 +1,7 @@
 from collections import deque
 
 class Sensors:
-    out = 0
+    far = 0
     close = 0.5
     collision = 1
     
