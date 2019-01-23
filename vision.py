@@ -3,7 +3,7 @@ from collections import Counter
 import cv2
 
 class Vision:
-    def __init__(self,robot,is_simulation=True,area_size=(4,3), downsampling_rate = 10, threshold= 3):
+    def __init__(self,robot,is_simulation,area_size=(4,3), downsampling_rate = 10, threshold= 3):
         """ Handles Input from the camera of the robot and discretizes it, to find the target color
             Example usage under color_per_area method
         Args:
