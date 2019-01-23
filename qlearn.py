@@ -24,7 +24,7 @@ def heardEnter():
 def dist(a,b):
     return np.linalg.norm(np.asarray(a)-np.asarray(b))
 
-rewards = {0:35,
+rewards = {0:25,
            1:17,
            2:17,
            3:7,
@@ -32,19 +32,26 @@ rewards = {0:35,
            5:2,
            6:2}
 
-def get_reward(action,vision, food_eaten_increased, collision):
-    if food_eaten_increased:
-        return 200;
-    if collision:
-        return -90;
+def get_reward(task_type,action,vision, food_eaten_increased, collision):
+    if task_type== 'avoid+forage':
+        if food_eaten_increased:
+            return 200;
+    if 'avoid' in task_type:
+        if collision:
+            return -90;
     #going back and forwards is not a proper movement
     #elif (last_action<=1 and action==5) or ((last_action==2 or last_action==0) and action==6) or \
     #   (last_action==5 and action<=1) or (last_action==6 and (action==2 or action==0)):
     #       return -2
-    elif np.any(vision) and action<=2:
-        return rewards[action]*3
-    else:
+    if task_type=='avoid':
         return rewards[action]
+    
+    if task_type=='forage':
+        return 10 if vision[int(np.ceil(vision.shape[0]/2.0))] else (5 if np.any(vision[1:-1]) else 2)
+    #if np.any(vision) and action<=2:
+    #    return rewards[action]*5
+    #else:
+    #    return rewards[action]
         
 
 
@@ -96,7 +103,7 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
     # Hyperparameters
     # Add adaptive parameters
     alpha_base = 0.4 #learning rate
-    gamma = 0.7 #future reward
+    gamma = 0.8 #future reward
     epsilon_base = 0.4 #exploration
     
     if task_type == 'avoid':
@@ -106,10 +113,10 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
         time_limit = 500000
         max_iterations= 900
     elif task_type == 'forage':
-        time_limit = 80000
+        time_limit = 300000
         max_iterations= 30
         
-    halving = max_iterations/6
+    halving = max_iterations/8.0
         
     
     # For plotting metrics
@@ -121,7 +128,7 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
          #   epsilon/=2
         epsilon = epsilon_base / (2**(i/halving))
         alpha = alpha_base*(0.03+float(max_iterations-i)/max_iterations)
-        #print('a={:.3f}, e={:.3f}'.format(alpha,epsilon))
+        print('a={:.3f}, e={:.3f}'.format(alpha,epsilon))
         
         #initialize World
         rob.stop_world()
@@ -140,6 +147,7 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
         y_max,x_max,y_min,x_min = position_start[1],position_start[0],position_start[1],position_start[0]
         position_current = position_start
         stats.add_path()
+        photo = [0, 0, 0, 0, 0]
         
         while not done:
             #save last states
@@ -157,12 +165,13 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
                 action = np.argmax(q_table[state_prev]) # Exploit learned values
             
             # so that it doesn't jump around
-            if (action_prev>=5 and action<5) or (action_prev<5 and action>5):
+            if (action_prev>=5 and action<5) or (action_prev<5 and action>=5):
                 time.sleep(1.5/8)
                 
             #perform action, read sensors
             move.move(action)
             sens_val, collision = sens.binary()
+            photo_prev = photo
             _,photo = see.color_per_area()
             photo=photo[0]
             
@@ -170,10 +179,15 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
             food_eaten = rob.collected_food()
             
             #Special forage-knowledge
-            if (np.sum(sens_val[3:])>=2) and not np.any(photo):
+            if (np.sum(sens_val[3:])>=2) and not np.any(photo_prev):
+                if np.sum(sens_val[3:4]>np.sum(sens_val[6:7])):
+                    spin = 2
+                else:
+                    spin = 1
                 move.backwards()
                 for j in range(5):
-                    move.spin_right()
+                    move.move(spin)
+                    #time.sleep(0.5)
                     if np.any(photo):
                         break;
                 continue
@@ -193,7 +207,7 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
                     state+= 2**(j) * photo[j]
             
             #calculate reward
-            reward = get_reward(action, photo,food_eaten-food_eaten_last,collision)             
+            reward = get_reward(task_type,action, photo,food_eaten-food_eaten_last,collision)             
             
             #update Q-table
             old_value = q_table[state_prev, action]
