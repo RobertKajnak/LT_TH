@@ -52,7 +52,7 @@ class Vision:
         image = self.rob.get_image_front()        
         image = image[int(image.shape[0]/5)::self.downsampling_rate,::self.downsampling_rate]
         
-        cv2.imwrite("test_image{}.png".format(self.img_counter), image)
+        #cv2.imwrite("test_image{}.png".format(self.img_counter), image)
         self.img_counter +=1
         
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -139,7 +139,6 @@ class Vision:
                 #print([y if y!=[] else 'b' for y in [x for x in Counter(lines)]])
         
         fn = ''.join(zones[0])
-        print(fn)
         cv2.imwrite("test_pictures{}_{}.png".format(self.img_counter,fn),downsampled_pic)
         return zones
     
