@@ -115,3 +115,5 @@ send_commands.py
 vrep/
 src/
 Dockerfile
+NEAT_progress/
+tables/
