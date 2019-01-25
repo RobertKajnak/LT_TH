@@ -229,7 +229,7 @@ class Genomes:
                 self.stats.add_continuous_point('{}_Food Eaten'.format(genome_id),collected_food)
                 
                 
-                if (time_passed > 100):   
+                if (time_passed > 60):   
                     print('Stop cause: Stepd')
                     done = True
                 elif (n_collisions > 2):
