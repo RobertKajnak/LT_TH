@@ -11,6 +11,7 @@ import pickle
 import statistics
 import select
 import sys
+import os
 
 def dist(a,b):
     return np.linalg.norm(np.asarray(a)-np.asarray(b))
@@ -118,7 +119,7 @@ class Genomes:
             #sensors_inputs = np.asarray(self.sensors.discrete())
             #photo = self.camera.color_per_area()
             sensors_inputs = [0]*8
-            camera_inputs = [0]*5
+            photo = [[0]*5]
     
             current_max_fitness = 0
             fitness_current = 0
@@ -140,7 +141,7 @@ class Genomes:
             while not done:            
     
                 # give sensors input to the neural net
-                nnOutput = net.activate(np.hstack((sensors_inputs, np.asarray(camera_inputs))))
+                nnOutput = net.activate(np.hstack((sensors_inputs, photo[0])))
                 nn_choice = np.argmax(nnOutput)
     
                 # perform action based on neural net output
@@ -169,7 +170,7 @@ class Genomes:
                     except:
                         print('waiting for camera recording')
                         
-                if ((np.any(sensors_inputs <= 0.15))) and (n_green == 0) and \
+                if (np.any(sensors_inputs==self.sensors.collision)) and (n_green == 0) and \
                     (collected_food==collected_food_prev):
                     n_collisions += 1
                     collision = True
@@ -258,6 +259,9 @@ class Genomes:
             return -1
         
 if __name__ == "__main__":
+    directory = 'NEAT_progress'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                      neat.DefaultSpeciesSet, neat.DefaultStagnation,
@@ -270,16 +274,16 @@ if __name__ == "__main__":
     gen = Genomes(ip_adress = '192.168.178.10')
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
-    p.add_reporter(neat.Checkpointer(10))
+    p.add_reporter(neat.Checkpointer(5,filename_prefix=directory + '/neat-checkpoint-'))
 
     # start training
-    winner = p.run(gen.eval_genomes, 2)
+    winner = p.run(gen.eval_genomes, 500)
 
-    stats.save_genome_fitness(delimiter=',')
+    stats.save_genome_fitness(delimiter=',',filename = directory + '/fitness_history.csv')
 
     gen.save()
 
-    with open('NEAT_progress/final_winner.pkl', 'wb') as output:
+    with open(directory+'/final_winner.pkl', 'wb') as output:
         pickle.dump(winner, output, 1)
 
 
