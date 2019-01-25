@@ -63,7 +63,7 @@ class Genomes:
         
         #robobo.HardwareRobobo(camera=True).connect(address="192.168.1.11")    
     def get_reward(self,action, prev_action, collision, collected_food, distance, \
-                   distance_max, n_green, prev_n_green, prev_coordinate_sum, coordinate_sum):
+                   distance_max, n_green, prev_n_green, movement_since_last_turn):
         reward_collision = 0
         reward_distance = 0
         reward_food = 0
@@ -71,7 +71,7 @@ class Genomes:
         reward_green = 0
         reward_position = 0
         
-        if coordinate_sum == prev_coordinate_sum:
+        if movement_since_last_turn <=0.05:
             reward_position = -20
         
         if collision:
@@ -101,6 +101,32 @@ class Genomes:
     def save(self):
         self.stats.save('NEAT_progress/all_stats.json')
     
+    def _attempt_read(self,read_function,error_message,max_attempts = 5, delay=1, arg_list = None):
+        """ Executes the provided function under a try/except.
+            Args:
+                read_function: function to be executed
+                error_message: message to be displayed
+                max_attempts: maximum number of attempts before retrying
+                delay: time to sleep between attempts in seconds
+                arg_list: a list of arguments to be passed to read_function.
+                    a value of None will call the fuction without arguments
+            Returns:
+                if succesful:
+                    value returned by read_function, True
+                otherwise:
+                    None, False
+        """
+        for i in range(max_attempts):           
+            try:
+                if arg_list is None:
+                    return read_function(),True
+                else:
+                    return read_function(*arg_list),True
+            except:
+                print(error_message + ': ' +  str(sys.exc_info()[0]) + ' attempt {}'.format(i))
+                time.sleep(delay)
+        return None, False
+        
     
     def eval_genomes(self,genomes, config):
         self.stats.add_path()
@@ -124,7 +150,6 @@ class Genomes:
             current_max_fitness = 0
             fitness_current = 0
             position_start = self.rob.position()
-            prev_coordinates_sum = 0
             prev_position = position_start
             distance_max = 0
             prev_n_green = 0
@@ -133,6 +158,8 @@ class Genomes:
             n_collisions = 0
             collected_food = 0
             collected_food_prev = 0
+            good_read = False
+            end_early = False
             # time_passed = number of movements done
             time_passed = 0
             # number of times in which a movement didn't change the position
@@ -145,91 +172,75 @@ class Genomes:
                 nn_choice = np.argmax(nnOutput)
     
                 # perform action based on neural net output
-                try:
-                    self.motions.move(nn_choice)
-                except:
-                    done = True
-                            
+                _,good_read = self._attempt_read(self.motions.move,\
+                                        error_message='Could not perform motion',\
+                                        arg_list=[nn_choice])
+                end_early |= not good_read
                 previous_action = nn_choice
+
+                #Read sensors and other data
+                sensors_inputs, good_read =self._attempt_read(self.sensors.discrete, 'IRS failed')
+                sensors_inputs = np.asarray(sensors_inputs)  
+                end_early |= not good_read
+
+                camera_data,good_read = self._attempt_read(self.camera.color_per_area,'Could not use camera')
+                photo,photo_binary = camera_data[0], camera_data[1]
+                n_green = np.sum(photo_binary[0])
+                end_early |= not good_read
                 
-                read = False
-                while read == False:           
-                    try:
-                        sensors_inputs = np.asarray(self.sensors.discrete())                    
-                        read = True 
-                    except:
-                        print('waiting for sensors recording')
-                
-                read2 = False
-                while read2 == False:
-                    try:
-                        photo,photo_binary = self.camera.color_per_area()
-                        #camera_inputs = [1 if pixel=='G' else 0 for pixel in photo[0]]
-                        n_green = np.sum(photo_binary[0])
-                        read2 = True
-                    except:
-                        print('waiting for camera recording')
-                        
-                if (np.any(sensors_inputs==self.sensors.collision)) and (n_green == 0) and \
-                    (collected_food==collected_food_prev):
-                    n_collisions += 1
-                    collision = True
-                else:
-                    collision = False
-                
-                read3 = False
-                while read3 == False:
-                    try:
-                        position_current = np.asarray(self.rob.position())
-                        read3 = True
-                    except:
-                        read3 = False
-                        print('waiting for position recording')
-                
-                distance = dist(position_current,position_start)
-                coordinates_sum = np.around(np.sum(position_current[0:2] - prev_position[0:2]),decimals=2)
-                
-                read4 = False
+                position_current, good_read = self._attempt_read(self.rob.position, 'Could not obtain position')
+                position_current = np.asanyarray(position_current)
+                end_early |= not good_read
+
                 collected_food_prev = collected_food
-                while read4 == False:
-                    try:
-                        collected_food = self.rob.collected_food()
-                        read4 = True
-                    except:
-                        read4 = False
-                        print('waiting for food recording')
+                collected_food, good_read = self._attempt_read(self.rob.collected_food, 'Could not obtain food data')
+                end_early |= not good_read
+                
+                if not end_early:
+                    if (np.any(sensors_inputs==self.sensors.collision)) and (n_green == 0) and \
+                        (collected_food==collected_food_prev):
+                        n_collisions += 1
+                        collision = True
+                    else:
+                        collision = False
+                    
+                    distance = dist(position_current,position_start)
+                    #coordinates_sum = np.around(np.sum(position_current[0:2] - prev_position[0:2]),decimals=2)
+                    dx = dist(position_current[0:2],prev_position[0:2])
+                    
+                    fitness_current += self.get_reward(nn_choice, previous_action, collision, \
+                                                  collected_food, distance, distance_max, \
+                                                  n_green, prev_n_green, dx)
+                    
+        
+                    
+                    distance_max = np.max((distance_max,distance))
+                    
+                    if fitness_current > current_max_fitness:
+                        current_max_fitness = fitness_current
+                    
+                    
+                    if  dx <= 0.05:
+                        stuck+=1
                         
-                fitness_current += self.get_reward(nn_choice, previous_action, collision, \
-                                              collected_food, distance, distance_max, \
-                                              n_green, prev_n_green, prev_coordinates_sum, coordinates_sum)
-                
-    
-                
-                distance_max = np.max((distance_max,distance))
-                
-                if fitness_current > current_max_fitness:
-                    current_max_fitness = fitness_current
-                
-                
-                if  coordinates_sum == prev_coordinates_sum:
-    #            if distance_max == distance:
-                    stuck+=1
-                prev_position = position_current
-                prev_coordinates_sum = coordinates_sum
-                
-                if n_green > 0:
-                    time_passed = time_passed - 3
-                else:
-                    time_passed += 3
-                prev_n_green = n_green
-                
-                self.stats.add_continuous_point('{}_Collisions'.format(genome_id),n_collisions)
-                self.stats.add_continuous_point('{}_Total Reward'.format(genome_id),fitness_current)
-                self.stats.add_continuous_point('{}_Max Distance Achieved'.format(genome_id),distance_max)
-                self.stats.add_continuous_point('{}_Food Eaten'.format(genome_id),collected_food)
-                
-                
-                if (time_passed > 60):   
+                    prev_position = position_current
+                    
+                    if n_green > 0:
+                        time_passed = time_passed - 3
+                    else:
+                        time_passed += 3
+                    prev_n_green = n_green
+                    
+                    self.stats.add_continuous_point('{}_Collisions'.format(genome_id),n_collisions)
+                    self.stats.add_continuous_point('{}_Total Reward'.format(genome_id),fitness_current)
+                    self.stats.add_continuous_point('{}_Max Distance Achieved'.format(genome_id),distance_max)
+                    self.stats.add_continuous_point('{}_Food Eaten'.format(genome_id),collected_food)
+                    
+
+                if not good_read:
+                    print('Sensor read failure. Simulating random heart attack')
+                    done = True                
+                elif (time_passed > 60):   
                     print('Stop cause: Stepd')
                     done = True
                 elif (n_collisions > 2):
