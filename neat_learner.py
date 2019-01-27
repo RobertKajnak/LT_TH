@@ -48,6 +48,12 @@ def heardEnter():
             return True
     return False
 
+def normalize(v):
+    norm = np.linalg.norm(v)
+    if norm == 0: 
+       return v
+    return v / norm
+
 class Genomes:
     def __init__(self, ip_adress):
         self.ip_adress = ip_adress
@@ -146,8 +152,8 @@ class Genomes:
             #sensors_inputs = np.asarray(self.sensors.discrete())
             #photo = self.camera.color_per_area()
             sensors_inputs = [0]*8
-            photo = [[0]*5]
-            photo_binary=[[0]*5]
+            photo = [0]*5
+            photo_binary=[0]*5
     
             current_max_fitness = 0
             fitness_current = 0
@@ -168,15 +174,19 @@ class Genomes:
             # number of times in which a movement didn't change the position
             stuck = 0
             collision = False
-            time_limit = 30
+            time_limit = 40
             while not done:            
     
                 # give sensors input to the neural net
                 prev_action_type = -1 if previous_action >=5 else (1 if previous_action<=2 else 0)
-                nnOutput = net.activate(np.hstack((sensors_inputs, photo[0],prev_action_type,prev_green)))
+                nnOutput = net.activate(np.hstack((sensors_inputs, photo,prev_action_type,prev_green)))
                 nn_choice = np.argmax(nnOutput)
     
-                # perform action based on neural net output
+#                # perform action based on neural net output
+#                if (previous_action <=2 and nn_choice>2) or (nn_choice<=2 and previous_action>2) or\
+#                    (previous_action >=5 and nn_choice<5) or (nn_choice>=5 and previous_action<5) or\
+#                    (previous_action==3 and nn_choice==4) or (nn_choice==4 and previous_action==5):
+#                        time.sleep(0.2)
                 _,good_read = self._attempt_read(self.motions.move,\
                                         error_message='Could not perform motion',\
                                         arg_list=[nn_choice])
@@ -184,15 +194,26 @@ class Genomes:
                 previous_action = nn_choice
 
                 #Read sensors and other data
-                sensors_inputs, good_read =self._attempt_read(self.sensors.discrete, 'IRS failed')
-                sensors_inputs = np.asarray(sensors_inputs)  
-                end_early |= not good_read
-
-                camera_data,good_read = self._attempt_read(self.camera.color_per_area,'Could not use camera')
-                prev_green = int(np.any(photo_binary[0]))
-                photo,photo_binary = camera_data[0], camera_data[1]
-                n_green = np.sum(photo_binary[0])
-                end_early |= not good_read
+                while True:#pseudo repeat-until or do-while structure
+                    photo_prev = photo
+                    sensors_inputs_prev = sensors_inputs
+                    
+                    sensors_inputs, good_read =self._attempt_read(self.sensors.discrete, 'IRS failed')
+                    sensors_inputs = np.asarray(sensors_inputs)  
+                    end_early |= not good_read
+    
+                    camera_data,good_read = self._attempt_read(self.camera.color_per_area,'Could not use camera')
+                    prev_green = int(np.any(photo_binary))
+                    photo,photo_binary = camera_data[0][0], camera_data[1][0]
+                    photo = normalize(photo)
+                    n_green = np.sum(photo_binary)
+                    end_early |= not good_read
+                    
+                    if not(np.all(photo==photo_prev) and np.all(sensors_inputs==sensors_inputs_prev)\
+                           and not (np.any(sensors_inputs==self.sensors.collision)) ):
+                        break;
+                    else:
+                        time.sleep(0.02)
                 
                 position_current, good_read = self._attempt_read(self.rob.position, 'Could not obtain position')
                 position_current = np.asanyarray(position_current)
@@ -234,7 +255,7 @@ class Genomes:
                     #    time_passed = time_passed - 3
                     #else:
                     #    time_passed += 3
-                    prev_n_green = n_green
+                    #prev_n_green = n_green
                     
                     self.stats.add_continuous_point('Collisions'.format(genome_id),n_collisions)
                     self.stats.add_continuous_point('Total Reward'.format(genome_id),fitness_current)
