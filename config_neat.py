@@ -1,19 +1,19 @@
 [NEAT]
 fitness_criterion     = mean 
-fitness_threshold     = 10000
-pop_size              = 10
+fitness_threshold     = 8
+pop_size              = 20
 reset_on_extinction   = True
 
 [DefaultGenome]
 # node activation options
 activation_default      = sigmoid
-activation_mutate_rate  = 0.1
+activation_mutate_rate  = 0.2
 activation_options      = sigmoid gauss relu tanh
 #abs clamped cube exp gauss hat identity inv log relu sigmoid sin softplus square tanh
 
 # node aggregation options
 aggregation_default     = sum
-aggregation_mutate_rate = 0.05
+aggregation_mutate_rate = 0.1
 aggregation_options     = sum product min max mean median maxabs
 
 # node bias options
@@ -47,7 +47,7 @@ node_delete_prob        = 0.3
 
 # network parameters
 num_hidden              = 1
-num_inputs              = 13
+num_inputs              = 15
 num_outputs             = 8
 
 # node response options
