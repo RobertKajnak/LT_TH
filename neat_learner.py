@@ -225,8 +225,8 @@ class Genomes:
                     if fitness_current > current_max_fitness:
                         current_max_fitness = fitness_current
 
-                    if  dx <= 0.05:
-                        stuck+=1
+#                    if  dx <= 0.05:
+#                        stuck+=1
                         
                     prev_position = position_current
                     
@@ -243,32 +243,32 @@ class Genomes:
                     
 
                 if not good_read:
-                    print('Sensor read failure. Simulating random heart attack')
+                    cause = 'Sensor read failure. Simulating random heart attack'
                     done = True                
                 elif (time_passed > time_limit):   
-                    print('Stop cause: Stepd')
+                    cause = 'Our of time'
                     done = True
                 elif (n_collisions > 2):
-                    print('Stop cause: Collisions')
+                    cause = 'Collisions'
                     done = True   
                 elif (time_passed > 75 and collected_food == 0):
-                    print('Stop cause: Not quick enough')
+                    cause = 'Not quick enough'
                     done = True
-                elif (stuck >= 4):
-                    print('Stop cause: Stuck')
-                    done = True
+#                elif (stuck >= 4):
+#                    cause = 'Stuck'
+#                    done = True
                     
                 time_passed+=1
             
-            print('Score={}, Food collected = {}, time penalty = {}, collision penalty= {}'.format(\
-                  genome.fitness, collected_food, 2*(float(time_passed)/time_limit),2*n_collisions) )
             genome.fitness = collected_food - 2*(float(time_passed)/time_limit) - 2*n_collisions
+            print('Score={:.3f}, Food = {}, Time- = {:.3f}, Collision- = {:.3f}, Termination: {}'.format(\
+                  genome.fitness, collected_food, 2*(float(time_passed)/time_limit),2*n_collisions,cause) )
             fitness_scores_dict[genome_id] = fitness_current
             
-#            if fitness_current > 1500:
-#                filename = 'NEAT_progress/' +  str(genome_id)+'.pkl'
-#                with open(filename, 'wb') as output:
-#                    pickle.dump(net, output, 1)
+            if fitness_current > 4:
+                filename = 'NEAT_progress/' +  str(genome_id)+'.pkl'
+                with open(filename, 'wb') as output:
+                    pickle.dump(net, output, 1)
             
             # stop simulation
             self.rob.stop_world()
