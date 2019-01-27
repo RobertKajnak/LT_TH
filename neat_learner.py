@@ -12,6 +12,7 @@ import statistics
 import select
 import sys
 import os
+from os.path import isfile, join
 
 def dist(a,b):
     return np.linalg.norm(np.asarray(a)-np.asarray(b))
@@ -218,8 +219,7 @@ class Genomes:
                     
                     if fitness_current > current_max_fitness:
                         current_max_fitness = fitness_current
-                    
-                    
+
                     if  dx <= 0.05:
                         stuck+=1
                         
@@ -274,11 +274,21 @@ if __name__ == "__main__":
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                     neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                     './config_neat.py')
+    onlyfiles = [f for f in os.listdir(directory) if isfile(join(directory, f))]
+    latest_checpoint = 'neat-checkpoint--1'
+    for fn in onlyfiles:
+        if 'neat-checkpoint-' in fn:
+            if int(fn[16:])>int(latest_checpoint[16:]):
+                latest_checpoint = fn
+            
+    if latest_checpoint[16:]==-1:
+        config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                 neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                 './config_neat.py')
 
-    p = neat.Population(config)
+        p = neat.Population(config)
+    else:
+        p = neat.Checkpointer.restore_checkpoint(directory + '/' +latest_checpoint)
 
     p.add_reporter(neat.StdOutReporter(True))
     
