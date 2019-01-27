@@ -187,7 +187,6 @@ class Genomes:
                 sensors_inputs, good_read =self._attempt_read(self.sensors.discrete, 'IRS failed')
                 sensors_inputs = np.asarray(sensors_inputs)  
                 end_early |= not good_read
-                print(sensors_inputs)
 
                 camera_data,good_read = self._attempt_read(self.camera.color_per_area,'Could not use camera')
                 prev_green = int(np.any(photo_binary[0]))
@@ -202,9 +201,9 @@ class Genomes:
                 collected_food_prev = collected_food
                 collected_food, good_read = self._attempt_read(self.rob.collected_food, 'Could not obtain food data')
                 end_early |= not good_read
-                
+
                 if not end_early:
-                    if (np.any(sensors_inputs==self.sensors.collision)) and (n_green == 0) and \
+                    if (np.any(sensors_inputs==self.sensors.collision)) and \
                         (collected_food==collected_food_prev):
                         n_collisions += 1
 #                        collision = True
