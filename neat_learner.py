@@ -147,6 +147,7 @@ class Genomes:
             #photo = self.camera.color_per_area()
             sensors_inputs = [0]*8
             photo = [[0]*5]
+            photo_binary=[[0]*5]
     
             current_max_fitness = 0
             fitness_current = 0
@@ -159,6 +160,7 @@ class Genomes:
             n_collisions = 0
             collected_food = 0
             collected_food_prev = 0
+            prev_green=0
             good_read = False
             end_early = False
             # time_passed = number of movements done
@@ -166,10 +168,12 @@ class Genomes:
             # number of times in which a movement didn't change the position
             stuck = 0
             collision = False
+            time_limit = 30
             while not done:            
     
                 # give sensors input to the neural net
-                nnOutput = net.activate(np.hstack((sensors_inputs, photo[0])))
+                prev_action_type = -1 if previous_action >=5 else (1 if previous_action<=2 else 0)
+                nnOutput = net.activate(np.hstack((sensors_inputs, photo[0],prev_action_type,prev_green)))
                 nn_choice = np.argmax(nnOutput)
     
                 # perform action based on neural net output
@@ -183,8 +187,10 @@ class Genomes:
                 sensors_inputs, good_read =self._attempt_read(self.sensors.discrete, 'IRS failed')
                 sensors_inputs = np.asarray(sensors_inputs)  
                 end_early |= not good_read
+                print(sensors_inputs)
 
                 camera_data,good_read = self._attempt_read(self.camera.color_per_area,'Could not use camera')
+                prev_green = int(np.any(photo_binary[0]))
                 photo,photo_binary = camera_data[0], camera_data[1]
                 n_green = np.sum(photo_binary[0])
                 end_early |= not good_read
@@ -201,17 +207,17 @@ class Genomes:
                     if (np.any(sensors_inputs==self.sensors.collision)) and (n_green == 0) and \
                         (collected_food==collected_food_prev):
                         n_collisions += 1
-                        collision = True
-                    else:
-                        collision = False
+#                        collision = True
+#                    else:
+#                        collision = False
                     
                     distance = dist(position_current,position_start)
                     #coordinates_sum = np.around(np.sum(position_current[0:2] - prev_position[0:2]),decimals=2)
                     dx = dist(position_current[0:2],prev_position[0:2])
                     
-                    fitness_current += self.get_reward(nn_choice, previous_action, collision, \
-                                                  collected_food, distance, distance_max, \
-                                                  n_green, prev_n_green, dx)
+#                    fitness_current += self.get_reward(nn_choice, previous_action, collision, \
+#                                                  collected_food, distance, distance_max, \
+#                                                  n_green, prev_n_green, dx)
                     
         
                     
@@ -225,22 +231,22 @@ class Genomes:
                         
                     prev_position = position_current
                     
-                    if n_green > 0:
-                        time_passed = time_passed - 3
-                    else:
-                        time_passed += 3
+                    #if n_green > 0:
+                    #    time_passed = time_passed - 3
+                    #else:
+                    #    time_passed += 3
                     prev_n_green = n_green
                     
-                    self.stats.add_continuous_point('{}_Collisions'.format(genome_id),n_collisions)
-                    self.stats.add_continuous_point('{}_Total Reward'.format(genome_id),fitness_current)
-                    self.stats.add_continuous_point('{}_Max Distance Achieved'.format(genome_id),distance_max)
-                    self.stats.add_continuous_point('{}_Food Eaten'.format(genome_id),collected_food)
+                    self.stats.add_continuous_point('Collisions'.format(genome_id),n_collisions)
+                    self.stats.add_continuous_point('Total Reward'.format(genome_id),fitness_current)
+                    self.stats.add_continuous_point('Max Distance Achieved'.format(genome_id),distance_max)
+                    self.stats.add_continuous_point('Food Eaten'.format(genome_id),collected_food)
                     
 
                 if not good_read:
                     print('Sensor read failure. Simulating random heart attack')
                     done = True                
-                elif (time_passed > 60):   
+                elif (time_passed > time_limit):   
                     print('Stop cause: Stepd')
                     done = True
                 elif (n_collisions > 2):
@@ -255,13 +261,15 @@ class Genomes:
                     
                 time_passed+=1
             
-            genome.fitness = fitness_current
+            print('Score={}, Food collected = {}, time penalty = {}, collision penalty= {}'.format(\
+                  genome.fitness, collected_food, 2*(float(time_passed)/time_limit),2*n_collisions) )
+            genome.fitness = collected_food - 2*(float(time_passed)/time_limit) - 2*n_collisions
             fitness_scores_dict[genome_id] = fitness_current
             
-            if fitness_current > 1500:
-                filename = 'NEAT_progress/' +  str(genome_id)+'.pkl'
-                with open(filename, 'wb') as output:
-                    pickle.dump(net, output, 1)
+#            if fitness_current > 1500:
+#                filename = 'NEAT_progress/' +  str(genome_id)+'.pkl'
+#                with open(filename, 'wb') as output:
+#                    pickle.dump(net, output, 1)
             
             # stop simulation
             self.rob.stop_world()
@@ -281,7 +289,7 @@ if __name__ == "__main__":
             if int(fn[16:])>int(latest_checpoint[16:]):
                 latest_checpoint = fn
             
-    if latest_checpoint[16:]==-1:
+    if int(latest_checpoint[16:])==-1:
         config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                  neat.DefaultSpeciesSet, neat.DefaultStagnation,
                  './config_neat.py')
