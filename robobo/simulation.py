@@ -72,6 +72,9 @@ class SimulationRobobo(Robobo):
         self._initial_position = vrep.simxGetObjectPosition(self._clientID, self._Robobo, -1, vrep.simx_opmode_blocking)
         #self._initial_position= (self._initial_position[1][0],self._initial_position[1][1],self._initial_position[1][2])
         
+        self._right_speed = 0.0
+        self._left_speed = 0.0
+        
         return self
 
     def _vrep_get_ping_time(self):
@@ -117,11 +120,49 @@ class SimulationRobobo(Robobo):
         left = left/normalizer
         right = right/normalizer
 
-#        t_sim = self.getTime()
         self._vrep_set_joint_target_velocity(self._LeftMotor, left, vrep.simx_opmode_oneshot)
         self._vrep_set_joint_target_velocity(self._RightMotor, right, vrep.simx_opmode_oneshot)
         self._vrep_get_ping_time()
+
+        duration = millis / 5000.0
+        # startTime = time.time()
+        # while time.time() - startTime < duration:
+        #     # rightMotorAngPos = vrep.unwrap_vrep(vrep.simxGetJointPosition(self._clientID, self._RightMotor, vrep.simx_opmode_blocking))
+        #     # leftMotorAngPos  = vrep.unwrap_vrep(vrep.simxGetJointPosition(self._clientID, self._LeftMotor, vrep.simx_opmode_blocking))
+        #     # RoboAbsPos       = vrep.unwrap_vrep(vrep.simxGetObjectPosition(self._clientID, self._Robobo, -1, vrep.simx_opmode_blocking))
+        #     time.sleep(0.005)
+        #print("sleeping for {}".format(duration))
+        time.sleep(duration)
         
+        # Stop to move the wheels motor. Angular velocity.
+        stopRightVelocity = stopLeftVelocity = 0
+        self._vrep_set_joint_target_velocity(self._LeftMotor, stopLeftVelocity,
+                                                  vrep.simx_opmode_oneshot)
+        self._vrep_set_joint_target_velocity(self._RightMotor, stopRightVelocity,
+                                                  vrep.simx_opmode_oneshot)
+        self._vrep_get_ping_time()
+
+    def move2(self, left, right, millis=500):
+        normalizer = 10.0
+        
+        left = left/normalizer
+        right = right/normalizer
+
+        print('l={},r={}'.format(left,right))
+        if (left==self._left_speed) and (right==self._right_speed):
+            self._vrep_get_ping_time()
+            return 
+        
+        for l,r in zip(np.arange(self._left_speed,left, (left-self._left_speed+0.01)/20.0),\
+                       np.arange(self._right_speed,right,(right-self._right_speed+0.01)/20.0)):
+    #        t_sim = self.getTime()
+            self._vrep_set_joint_target_velocity(self._LeftMotor, l, vrep.simx_opmode_oneshot)
+            self._vrep_set_joint_target_velocity(self._RightMotor, r, vrep.simx_opmode_oneshot)
+            #self._vrep_get_ping_time()
+            time.sleep(0.01)
+        
+        self._left_speed = left
+        self._right_speed = right
 #        t = int(time.time()*1000)
 #        
 #        dt = t - self._prev_real_time
@@ -141,15 +182,15 @@ class SimulationRobobo(Robobo):
         #     # RoboAbsPos       = vrep.unwrap_vrep(vrep.simxGetObjectPosition(self._clientID, self._Robobo, -1, vrep.simx_opmode_blocking))
         #     time.sleep(0.005)
         #print("sleeping for {}".format(duration))
-        duration = millis / 7000.0 
-        time.sleep(duration)
-        
-        # Stop to move the wheels motor. Angular velocity.
-        stopRightVelocity = stopLeftVelocity = 0
-        self._vrep_set_joint_target_velocity(self._LeftMotor, stopLeftVelocity,
-                                                  vrep.simx_opmode_oneshot)
-        self._vrep_set_joint_target_velocity(self._RightMotor, stopRightVelocity,
-                                                  vrep.simx_opmode_oneshot)
+#        duration = millis / 7000.0 
+#        time.sleep(duration)
+#        
+#        # Stop to move the wheels motor. Angular velocity.
+#        stopRightVelocity = stopLeftVelocity = 0
+#        self._vrep_set_joint_target_velocity(self._LeftMotor, stopLeftVelocity,
+#                                                  vrep.simx_opmode_oneshot)
+#        self._vrep_set_joint_target_velocity(self._RightMotor, stopRightVelocity,
+#                                                  vrep.simx_opmode_oneshot)
         self._vrep_get_ping_time()
 
     def talk(self, message):
@@ -300,3 +341,6 @@ class SimulationRobobo(Robobo):
 
     def getTime(self):
         return vrep.simxGetLastCmdTime(self._clientID)
+    
+    def visuals_off(self):
+        vrep.simxSetBooleanParameter(self._clientID,vrep.sim_boolparam_display_enabled,False, vrep.simx_opmode_blocking)
