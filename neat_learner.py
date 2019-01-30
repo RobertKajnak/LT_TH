@@ -390,7 +390,7 @@ class Genomes:
                 time_penalty = 4.0*time_passed/time_limit
                 variance_bonus = 2.0*(output_max-output_min)
                 genome.fitness = food_bonus + variance_bonus - time_penalty
-                print('Score={:.3f}, Food = {}, Output variance = {:.3f}, Speed penalty = {:.3f}, Termination: {}'.format(\
+                print('Score={:.3f}, Food = {}, Output delta = {:.3f}, Speed penalty = {:.3f}, Termination: {}'.format(\
                          genome.fitness, food_bonus, variance_bonus, time_penalty,cause) )
             fitness_scores_dict[genome_id] = fitness_current
             
