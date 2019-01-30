@@ -56,9 +56,17 @@ def normalize(v):
        return v
     return v / norm
 
+def relu_activation(z):
+    return z if z > 0.0 else 0.0
+
 class Genomes:
-    def __init__(self, ip_adress):
+    def __init__(self, ip_adress, input_type):
+        """ type refers to the number of input values:
+            15,12 or 3
+        """
         self.ip_adress = ip_adress
+        self.input_type = input_type
+        
         self.rob = robobo.SimulationRobobo().connect(address=ip_adress, port=19997)
         
                 # motion calss
@@ -66,7 +74,13 @@ class Genomes:
         # sensors class
         self.sensors = irsensors.Sensors(self.rob, is_simulation=True)
         # camera class
-        self.camera = vision.Vision(self.rob, is_simulation=True, area_size=(1,5),downsampling_rate=5)
+        if self.input_type==3:
+            self.camera = vision.Vision(self.rob, is_simulation=True, area_size=(1,3),downsampling_rate=5)
+            self.output_min = 1
+            self.output_max = -1
+        else:
+            self.camera = vision.Vision(self.rob, is_simulation=True, area_size=(1,5),downsampling_rate=5)
+            
         # statistics
         self.stats = statistics.Statistics()  
         
@@ -166,14 +180,18 @@ class Genomes:
             self.rob.play_simulation()
             #self.rob.visuals_off()
             # create random neural network
-            net = neat.nn.feed_forward.FeedForwardNetwork.create(genome, config)
+            net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
             
             #sensors_inputs = np.asarray(self.sensors.discrete())
             #photo = self.camera.color_per_area()
             sensors_inputs = [0]*8
-            photo = [0]*5
-            photo_binary=[0]*5
-            photo_binary_prev = photo_binary
+            if self.input_type==3:
+                photo = [0]*3
+                photo_binary = [0]*3
+            else:
+                photo = [0]*5
+                photo_binary=[0]*5
+                photo_binary_prev = photo_binary
     
             fitness_current = 0
             position_start = self.rob.position()
@@ -194,30 +212,80 @@ class Genomes:
             #stuck = 0
             collision = False
             collision_prev = False
-            time_limit = 45
+            time_limit = 50
             while not done:            
-    
                 # give sensors input to the neural net
-                #prev_action_type = -1 if previous_action >=5 else (1 if previous_action<=2 else 0)
-
-                nn_input = np.hstack((sensors_inputs[1::2], photo_binary_prev[0],photo,photo_binary_prev[-1],prev_green))
-               # print (nn_input)
+                if self.input_type==15:
+                    prev_action_type = -1 if previous_action >=5 else (1 if previous_action<=2 else 0)
+                    nn_input = np.hstack((sensors_inputs, photo,prev_action_type,prev_green))
+                elif self.input_type==12:
+                    nn_input = np.hstack((sensors_inputs[1::2], photo_binary_prev[0],photo,photo_binary_prev[-1],prev_green))
+                elif self.input_type==3:
+                    nn_input = photo
+                #print (nn_input)
                 nnOutput = net.activate(nn_input)
-                nn_choice = np.argmax(nnOutput)
-                self._add_action_to_history(nn_choice)
-    
-#                # perform action based on neural net output
-                #reduce jumping behaviour
-                if (previous_action <=2 and nn_choice>2) or (nn_choice<=2 and previous_action>2) or\
-                    (previous_action >=5 and nn_choice<5) or (nn_choice>=5 and previous_action<5) or\
-                    (previous_action==3 and nn_choice==4) or (nn_choice==4 and previous_action==5):
-                        time.sleep(0.8)
+                #print (nnOutput)
                 
-                _,good_read = self._attempt_read(self.motions.move,\
+                if self.input_type ==12 or self.input_type == 15:
+                    nn_choice = np.argmax(nnOutput)
+                    self._add_action_to_history(nn_choice)
+                    #reduce jumping behaviour
+                    if (previous_action <=2 and nn_choice>2) or (nn_choice<=2 and previous_action>2) or\
+                        (previous_action >=5 and nn_choice<5) or (nn_choice>=5 and previous_action<5) or\
+                        (previous_action==3 and nn_choice==4) or (nn_choice==4 and previous_action==5):
+                            time.sleep(0.8)
+                            
+                    # perform action based on neural net output
+                    _,good_read = self._attempt_read(self.motions.move,\
+                                            error_message='Could not perform motion',\
+                                            arg_list=[nn_choice])
+                    end_early |= not good_read
+                    previous_action = nn_choice
+                else:
+                    #x = (nnOutput[0]-0.5) * 2# For activation functions [0,1] like sigmoid
+                    x = nnOutput[0] #for activation functions [-1,1] like clapmed
+                    x = np.min((np.max((x,-1)),1)) #just in case
+                    self.output_min = np.min((x,self.output_min))
+                    self.output_max = np.max((x,self.output_max))
+                    
+                    offset = 0.1 #to reduce oscillation
+                    n = self.motions.speed #max speed
+                    left = n*(1-2*relu_activation(x-offset)) #refer to documentation 
+                    right = n*(1-2*relu_activation(-x+offset)) #for a graph of this logic
+                    #self.rob.move(left,right,self.motions.time) 
+                    
+                    _,good_read = self._attempt_read(self.rob.move,\
+                                    error_message='Could not perform motion',\
+                                    arg_list=[left,right,self.motions.time])
+                    end_early |= not good_read
+                    
+                    #Special forage-knowledge
+                    if (np.sum(sensors_inputs[3:])>=2) and not prev_green:
+                        #print('Avoiding Wall')
+                        if np.sum(sensors_inputs[3:4]>np.sum(sensors_inputs[6:7])):
+                            spin = 4
+                        else:
+                            spin = 3
+                            _,good_read = self._attempt_read(self.motions.backwards,\
+                                        error_message='Could not perform motion')
+                        for j in range(5):
+                            camera_data,good_read = self._attempt_read(self.camera.color_per_area,'Could not use camera')
+                            end_early |= not good_read
+                            
+                            if not good_read:
+                                break;
+                                
+                            photo,photo_binary = camera_data[0][0], camera_data[1][0]
+                            _,good_read = self._attempt_read(self.motions.move,\
                                         error_message='Could not perform motion',\
-                                        arg_list=[nn_choice])
-                end_early |= not good_read
-                previous_action = nn_choice
+                                        arg_list=[spin])
+                            
+                            end_early |= not good_read
+                            if np.any(photo_binary) or not good_read:
+                                break;
+                        
+    
+
 
                 #Read sensors and other data
                # for i in range(20):#pseudo repeat-until or do-while structure
@@ -305,13 +373,20 @@ class Genomes:
                     done = True
                 elif (n_collisions >= 4):
                     cause = 'Collisions'
-                    done = True   
-                    
+                    done = True
+                elif (collected_food == 9):
+                    cause = 'All food eaten'
+                    done = True
                 time_passed+=1
             
-            genome.fitness = collected_food - n_collisions/2.0 + fitness_current/7.0
-            print('Score={:.3f}, Food = {}, Spinning- = {:.3f}, Collision- = {:.3f}, Termination: {}'.format(\
-                  genome.fitness, collected_food, fitness_current/7.0, n_collisions/2.0,cause) )
+            if self.input_type ==12 or self.input_type==15:
+                genome.fitness = collected_food - n_collisions/2.0 + fitness_current/7.0
+                print('Score={:.3f}, Food = {}, Spinning- = {:.3f}, Collision- = {:.3f}, Termination: {}'.format(\
+                      genome.fitness, collected_food, fitness_current/7.0, n_collisions/2.0,cause) )
+            elif self.input_type==3:
+                genome.fitness = collected_food - 2.0*time_passed/time_limit + 2.0*(self.output_max-self.output_min)
+                print('Score={:.3f}, Food = {}, Speed penalty = {:.3f}, Output variance = {:.3f}, Termination: {}'.format(\
+                         genome.fitness, collected_food, 2.0*time_passed/time_limit, 2.0*(self.output_max-self.output_min),cause) )
             fitness_scores_dict[genome_id] = fitness_current
             
             if fitness_current > 4:
@@ -325,7 +400,7 @@ class Genomes:
         if heardEnter():
             return -1
 
-def train(IP):
+def train(IP,input_type):
     directory = 'NEAT_progress'
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -348,7 +423,7 @@ def train(IP):
 
     p.add_reporter(neat.StdOutReporter(True))
     
-    gen = Genomes(ip_adress = IP)
+    gen = Genomes(ip_adress = IP,input_type = input_type)
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
     p.add_reporter(neat.Checkpointer(5,filename_prefix=directory + '/neat-checkpoint-'))
@@ -435,6 +510,6 @@ def test(IP,filename,filename_config,is_simulation=False):
 if __name__ == "__main__":
     IP = '192.168.178.10'
     np.set_printoptions(precision=2)
-    train(IP)
+    train(IP,input_type=3)
     #test(IP,filename='final_winner.pkl',filename_config='src/config_neat.py')
 
