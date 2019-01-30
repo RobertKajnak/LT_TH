@@ -282,7 +282,7 @@ class Genomes:
                                         arg_list=[spin])
                             
                             end_early |= not good_read
-                            time.sleep(0.2)
+                            time.sleep(0.8)
                             if np.any(photo_binary) or not good_read:
                                 break;
                         
@@ -388,7 +388,7 @@ class Genomes:
             elif self.input_type==3:
                 food_bonus = collected_food
                 time_penalty = 4.0*time_passed/time_limit
-                variance_bonus = np.min((2.0*(output_max-output_min),3))
+                variance_bonus = np.min((2.5*(output_max-output_min),4))
                 genome.fitness = food_bonus + variance_bonus - time_penalty
                 print('Score={:.3f}, Food = {}, Output delta = {:.3f}, Speed penalty = {:.3f}, Termination: {}'.format(\
                          genome.fitness, food_bonus, variance_bonus, time_penalty,cause) )
