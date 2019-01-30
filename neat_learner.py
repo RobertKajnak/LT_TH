@@ -76,8 +76,6 @@ class Genomes:
         # camera class
         if self.input_type==3:
             self.camera = vision.Vision(self.rob, is_simulation=True, area_size=(1,3),downsampling_rate=5)
-            self.output_min = 1
-            self.output_max = -1
         else:
             self.camera = vision.Vision(self.rob, is_simulation=True, area_size=(1,5),downsampling_rate=3)
             
@@ -206,6 +204,8 @@ class Genomes:
             prev_green=0
             good_read = False
             end_early = False
+            output_min = 1
+            output_max = -1
             # time_passed = number of movements done
             time_passed = 0
             # number of times in which a movement didn't change the position
@@ -245,8 +245,8 @@ class Genomes:
                     #x = (nnOutput[0]-0.5) * 2# For activation functions [0,1] like sigmoid
                     x = nnOutput[0] #for activation functions [-1,1] like clapmed
                     x = np.min((np.max((x,-1)),1)) #just in case
-                    self.output_min = np.min((x,self.output_min))
-                    self.output_max = np.max((x,self.output_max))
+                    output_min = np.min((x,output_min))
+                    output_max = np.max((x,output_max))
                     
                     offset = 0.1 #to reduce oscillation
                     n = self.motions.speed #max speed
@@ -386,9 +386,12 @@ class Genomes:
                 print('Score={:.3f}, Food = {}, Spinning- = {:.3f}, Collision- = {:.3f}, Termination: {}'.format(\
                       genome.fitness, collected_food, fitness_current/7.0, n_collisions/2.0,cause) )
             elif self.input_type==3:
-                genome.fitness = collected_food - 2.0*time_passed/time_limit + 2.0*(self.output_max-self.output_min)
-                print('Score={:.3f}, Food = {}, Speed penalty = {:.3f}, Output variance = {:.3f}, Termination: {}'.format(\
-                         genome.fitness, collected_food, 2.0*time_passed/time_limit, 2.0*(self.output_max-self.output_min),cause) )
+                food_bonus = collected_food
+                time_penalty = 4.0*time_passed/time_limit
+                variance_bonus = 2.0*(output_max-output_min)
+                genome.fitness = food_bonus + variance_bonus - time_penalty
+                print('Score={:.3f}, Food = {}, Output variance = {:.3f}, Speed penalty = {:.3f}, Termination: {}'.format(\
+                         genome.fitness, food_bonus, variance_bonus, time_penalty,cause) )
             fitness_scores_dict[genome_id] = fitness_current
             
             if fitness_current > 4:
