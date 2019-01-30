@@ -79,7 +79,7 @@ class Genomes:
             self.output_min = 1
             self.output_max = -1
         else:
-            self.camera = vision.Vision(self.rob, is_simulation=True, area_size=(1,5),downsampling_rate=5)
+            self.camera = vision.Vision(self.rob, is_simulation=True, area_size=(1,5),downsampling_rate=3)
             
         # statistics
         self.stats = statistics.Statistics()  
@@ -268,6 +268,7 @@ class Genomes:
                             spin = 3
                             _,good_read = self._attempt_read(self.motions.backwards,\
                                         error_message='Could not perform motion')
+                            time.sleep(0.5)
                         for j in range(5):
                             camera_data,good_read = self._attempt_read(self.camera.color_per_area,'Could not use camera')
                             end_early |= not good_read
@@ -281,6 +282,7 @@ class Genomes:
                                         arg_list=[spin])
                             
                             end_early |= not good_read
+                            time.sleep(0.2)
                             if np.any(photo_binary) or not good_read:
                                 break;
                         
