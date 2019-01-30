@@ -4,9 +4,9 @@ import time
 import robobo
 import cv2
 import numpy as np
+import irsensors
 import vision
 import motion
-import irsensors
 import random
 import select
 import sys
@@ -47,17 +47,25 @@ def get_reward(task_type,action,vision, food_eaten_increased, collision):
         return rewards[action]
     
     if task_type=='forage':
-        return 10 if vision[int(np.ceil(vision.shape[0]/2.0))] else (5 if np.any(vision[1:-1]) else 2)
-    #if np.any(vision) and action<=2:
-    #    return rewards[action]*5
-    #else:
-    #    return rewards[action]
+        #return 10 if vision[int(np.ceil(vision.shape[0]/2.0))] else (5 if np.any(vision[1:-1]) else 2)
+        if np.any(vision[1:-1]):
+            return 10
+        if np.any(vision):
+            return 3
+        return 0
+    
+    if task_type=='avoid+forage':
+        if np.any(vision) and action<=2:
+            return rewards[action]*3
+        else:
+            return rewards[action]
         
 
 
-def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_filename=None,stats_filename=None):
+def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable=None,stats_filename=None):
     '''
     params:
+        starting_qtable : either a filename or the q table itself
         starting_episode==None starts from scratch
         task type = ['avoid','forage',[avoid+forage']
     '''
@@ -76,9 +84,9 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
     sens = irsensors.Sensors(rob,is_simulation)
     
     if task_type == 'avoid+forage':
-        see = vision.Vision(rob,is_simulation,(1,2),downsampling_rate=3)
+        see = vision.Vision(rob,is_simulation,area_size=(1,2),downsampling_rate=3)
     elif task_type == 'forage':
-        see = vision.Vision(rob,is_simulation,(1,3),downsampling_rate=3)
+        see = vision.Vision(rob,is_simulation,area_size=(1,5),downsampling_rate=3)
     
     #set phone position:
     rob.set_phone_tilt(0.4, 10)
@@ -90,20 +98,20 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
         stats = statistics.Statistics(stats_filename)
     
     #initialize Q-table
-    if starting_qtable_filename:
-        q_table = np.load(starting_qtable_filename)
+    if isinstance(starting_qtable,str):
+        q_table = np.load(starting_qtable)
     else:
         if task_type == 'avoid':
             q_table = np.zeros([2**8*7, 7])
         elif task_type=='avoid+forage':
             q_table = np.zeros([2**8*7*2**2, 7])
         elif task_type=='forage':
-            q_table = np.zeros([2**5,5]) 
+            q_table = np.zeros([2**5,3]) 
 
     # Hyperparameters
     # Add adaptive parameters
     alpha_base = 0.4 #learning rate
-    gamma = 0.8 #future reward
+    gamma = 0.4 #future reward
     epsilon_base = 0.4 #exploration
     
     if task_type == 'avoid':
@@ -111,12 +119,12 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
         max_iterations = 600
     elif task_type == 'avoid+forage':
         time_limit = 500000
-        max_iterations= 900
+        max_iterations= 400
     elif task_type == 'forage':
-        time_limit = 300000
-        max_iterations= 30
+        time_limit = 150000
+        max_iterations= 40
         
-    halving = max_iterations/8.0
+    halving = max_iterations/7.0
         
     
     # For plotting metrics
@@ -148,6 +156,10 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
         position_current = position_start
         stats.add_path()
         photo = [0, 0, 0, 0, 0]
+        photo_prev = photo
+        sens_val = [0]*8
+        sens_val_prev = sens_val
+        collision = False
         
         while not done:
             #save last states
@@ -157,7 +169,7 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
             #choose either best or random action
             if random.uniform(0, 1) < epsilon:
                 if task_type == 'forage':
-                    action = random.choice(range(5))
+                    action = random.choice(range(3))
                 else:
                     action = random.choice(range(7))
                     
@@ -170,25 +182,36 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
                 
             #perform action, read sensors
             move.move(action)
-            sens_val, collision = sens.binary()
-            photo_prev = photo
-            _,photo = see.color_per_area()
-            photo=photo[0]
+            
+            while True:
+                photo_prev = photo
+                sens_val_prev = sens_val
+                
+                sens_val, collision = sens.binary()
+                photo_prev = photo
+        
+                _,photo = see.color_per_area()
+                photo=photo[0]
+                time.sleep(0.02)
+                
+                if not(np.all(photo==photo_prev) and np.all(sens_val==sens_val_prev) and (not collision)):
+                    break;
             
             food_eaten_last = food_eaten
             food_eaten = rob.collected_food()
             
             #Special forage-knowledge
-            if (np.sum(sens_val[3:])>=2) and not np.any(photo_prev):
+            if task_type=='forage' and (np.sum(sens_val[3:])>=2) and not np.any(photo_prev):
                 if np.sum(sens_val[3:4]>np.sum(sens_val[6:7])):
-                    spin = 2
+                    spin = 4
                 else:
-                    spin = 1
+                    spin = 3
                 move.backwards()
                 for j in range(5):
                     move.move(spin)
-                    #time.sleep(0.5)
-                    if np.any(photo):
+                    time.sleep(1/7.0)
+                    _,photo = see.color_per_area()
+                    if np.any(photo[0]):
                         break;
                 continue
                 
@@ -208,6 +231,8 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
             
             #calculate reward
             reward = get_reward(task_type,action, photo,food_eaten-food_eaten_last,collision)             
+            #print(reward)
+            #print(state)
             
             #update Q-table
             old_value = q_table[state_prev, action]
@@ -272,7 +297,7 @@ def train(IP,task_type,is_simulation=True,directory='tables/',starting_qtable_fi
     rob.stop_world()
     
     
-def test(q_table_filename,IP,is_simulation=False):
+def test(q_table_filename,IP,task_type,is_simulation=False):
     #initialize robot
     if is_simulation:
         rob = robobo.SimulationRobobo().connect(address=IP, port=19997)
@@ -290,8 +315,9 @@ def test(q_table_filename,IP,is_simulation=False):
     
     move = motion.Motion(rob,is_simulation,speed=30,time=500)
     sens = irsensors.Sensors(rob,is_simulation)
-    see = vision.Vision(rob, is_simulation,(1,5),5)
-    
+    see = vision.Vision(rob, is_simulation,area_size=(1,5),downsampling_rate=5,\
+                        target_color_min=(170,130,20),target_color_max=(180,255,255))
+    see.add_filter((0,130,20),(10,255,255))
     #load Q-table    
     q_table = np.load(q_table_filename)
     
@@ -300,31 +326,75 @@ def test(q_table_filename,IP,is_simulation=False):
 
     init = True
     action = 0
+    photo = [0,0,0,0,0]
+    phot_prev = photo
+    sens_val = [0]*8
     action_prev = action
     #target_color = 'G'
-    
+    SS=0
     img_counter = 0
     print('Starting action. Press Enter to stop')
     i=0
     while not heardEnter():
         state = 0
+        phot_prev = photo
+        sens_val_prev = sens_val
         sens_val, collision = sens.binary()
         photo,photo_binary = see.color_per_area()
-        print(photo)
-        print(photo_binary)
+        
+#        rob.talk('Yo')
+#        '''if SS ==0:
+#            move.forward()
+#            SS=1
+#        else:
+#            move.backwards()
+#            SS=0'''
+#        time.sleep(1)
+#        continue
+        #print(photo)
+        print(sens_val)
+        #print(photo_binary)
+        photo_prev = photo
+        photo = photo_binary[0]
         #visual_object = [1 if pixel==target_color else 0 for pixel in photo[0]]
         
-        for j in range(8):
-            state+=sens_val[j]*2**(j)
-            
-            #vision
-        state+=(2**8)*action_prev
-        #for j in range(2):
-        #    state+= (2**8)*7* 2**j * visual_object[j]
+            #calculate state
+        state = 0
+        if task_type=='avoid' or task_type=='avoid+forage':
+            for j in range(8):
+                state+=sens_val[j]*2**(j)
+            state+=(2**8)*action_prev
+        if task_type=='avoid+forage':
+            for j in range(2):
+                state+= (2**8)*7* 2**j * photo[j]
+        if task_type=='forage':
+            for j in range(3):
+                state+= 2**(j) * photo[j]
+        
+        #Special forage-knowledge
+        if task_type=='forage' and (np.sum(sens_val[3:])>=2) and not np.any(photo_prev):
+            if np.sum(sens_val[3:4]>np.sum(sens_val[6:7])):
+                spin = 4
+            else:
+                spin = 3
+            move.backwards()
+            move.backwards()
+            for j in range(5):
+                _,photo_binary = see.color_per_area()
+                photo=photo_binary[0]
+                move.move(spin)
+                if np.any(photo):
+                    break;
+            continue
+    
     
         action_prev = action
         action = np.argmax(q_table[state])
         
+        if action == 4:
+            action =2
+        elif action == 3:
+            action =1
         #print sensor values for debug
         #print(sens_val)
         #print(sens.continuous())
@@ -333,7 +403,7 @@ def test(q_table_filename,IP,is_simulation=False):
         #image = rob.get_image_front()
         #cv2.imwrite("test_pictures{}.png".format(img_counter),image)
         img_counter+=1
-        print(i)
+        rob.talk(str(i))
         i+=1
         #Initialize sensors to base values
         if not is_simulation and not init:
@@ -348,7 +418,7 @@ def test(q_table_filename,IP,is_simulation=False):
                 rob.talk('Get away from me!')
                 time.sleep(2)
                 sens.set_sensor_baseline()
-                rob.talk('Baseline set. Starting Patrol')
+                rob.talk('Baseline set. Bananaaa')
             
         move.move(action)
         
@@ -357,9 +427,23 @@ def test(q_table_filename,IP,is_simulation=False):
         
 if __name__ == "__main__":
     #'192.168.1.15'  '196.168.137.1'
-    train('192.168.178.24','forage')
+    #train('192.168.178.10','forage')
+    
     #test('q_table552_vision_attempt1.npy','192.168.137.36', is_simulation = False )
     #test('q_table185_adaptive_2.npy','192.168.137.91')
-    #test('q_table552_vision_attempt1.npy','192.168.137.91')
+    #test('q_table552_vision_attempt1.npy','192.168.137.91','avoid')
+    
+    #%% Train with avoid and forage
+    #q_start = np.load('q_table185_adaptive_2.npy')
+    #q_start.resize((2**8*7*2**2, 7))
+    #train('192.168.178.24','avoid+forage',starting_qtable= q_start)
+
+    #test 
+    #this is good
+    test('q_table29_vision_reward.npy','192.168.137.38','forage')
+    
+    #test('q_table10_vision_reward.npy','192.168.137.250','forage')
+    
+    
     
     
