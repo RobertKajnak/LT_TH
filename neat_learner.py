@@ -371,7 +371,7 @@ class Genomes:
                 elif (time_passed > time_limit):   
                     cause = 'Our of time'
                     done = True
-                elif (n_collisions >= 4):
+                elif (n_collisions >= 4) and self.input_type!=3:
                     cause = 'Collisions'
                     done = True
                 elif (collected_food == 9):
