@@ -398,15 +398,18 @@ def test(IP,filename,filename_config,is_simulation=False):
     sensors_inputs = [0]*8
     photo = [0]*5
     photo_binary=[0]*5
+    photo_binary_prev = photo_binary
     previous_action = 0
     prev_green = 0
             
     while not heardEnter():            
         # give sensors input to the neural net
-        prev_action_type = -1 if previous_action >=5 else (1 if previous_action<=2 else 0)
+        #prev_action_type = -1 if previous_action >=5 else (1 if previous_action<=2 else 0)
 
         #print(np.hstack((sensors_inputs, photo,prev_action_type,prev_green)))
-        nnOutput = net.activate(np.hstack((sensors_inputs, photo,prev_action_type,prev_green)))
+        #nn_input = np.hstack((sensors_inputs, photo,prev_action_type,prev_green))
+        nn_input = np.hstack((sensors_inputs[1::2], photo_binary_prev[0],photo,photo_binary_prev[-1],prev_green))
+        nnOutput = net.activate(nn_input)
         nn_choice = np.argmax(nnOutput)    
         previous_action = nn_choice
         
@@ -418,8 +421,9 @@ def test(IP,filename,filename_config,is_simulation=False):
         
         sensors_inputs = sensors.discrete()
 
+        photo_binary_prev = photo_binary
         photo,photo_binary = camera.color_per_area()
-        photo=photo[0]
+        photo=normalize(photo[0])
         photo_binary = photo_binary[0]
         
         prev_green = int(np.any(photo_binary))
