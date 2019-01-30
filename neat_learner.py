@@ -164,7 +164,7 @@ class Genomes:
             print('Genome: ',genome_id)
             # start simulation
             self.rob.play_simulation()
-            self.rob.visuals_off()
+            #self.rob.visuals_off()
             # create random neural network
             net = neat.nn.feed_forward.FeedForwardNetwork.create(genome, config)
             
@@ -200,8 +200,8 @@ class Genomes:
                 # give sensors input to the neural net
                 #prev_action_type = -1 if previous_action >=5 else (1 if previous_action<=2 else 0)
 
-                nn_input = np.hstack((sensors_inputs[1::2], photo_binary_prev[0],photo,photo_binary_prev[-1],prev_green,))
-                #print (nn_input)
+                nn_input = np.hstack((sensors_inputs[1::2], photo_binary_prev[0],photo,photo_binary_prev[-1],prev_green))
+               # print (nn_input)
                 nnOutput = net.activate(nn_input)
                 nn_choice = np.argmax(nnOutput)
                 self._add_action_to_history(nn_choice)
@@ -211,7 +211,7 @@ class Genomes:
                 if (previous_action <=2 and nn_choice>2) or (nn_choice<=2 and previous_action>2) or\
                     (previous_action >=5 and nn_choice<5) or (nn_choice>=5 and previous_action<5) or\
                     (previous_action==3 and nn_choice==4) or (nn_choice==4 and previous_action==5):
-                        time.sleep(1.2)
+                        time.sleep(0.8)
                 
                 _,good_read = self._attempt_read(self.motions.move,\
                                         error_message='Could not perform motion',\
@@ -230,11 +230,9 @@ class Genomes:
 
                 camera_data,good_read = self._attempt_read(self.camera.color_per_area,'Could not use camera')
                 end_early |= not good_read
-                
                 prev_green = int(np.any(photo_binary))
                 photo_binary_prev = photo_binary
-                photo,photo_binary = camera_data[0][0], camera_data[1][0]
-                photo = normalize(photo)
+                
                 #n_green = np.sum(photo_binary)
                 
 #                    if not(np.all(photo==photo_prev) and np.all(sensors_inputs==sensors_inputs_prev)\
@@ -254,6 +252,9 @@ class Genomes:
                 collision_prev = collision
                 collision = np.any(sensors_inputs==self.sensors.collision)
                 if not end_early:
+                    photo,photo_binary = camera_data[0][0], camera_data[1][0]
+                    photo = normalize(photo)
+                    
                     if collision and collision_prev and\
                         (collected_food==collected_food_prev):
                         n_collisions += 1
