@@ -19,8 +19,8 @@ aggregation_options     = sum product min max mean maxabs
 # node bias options
 bias_init_mean          = 0.05
 bias_init_stdev         = 1.0
-bias_max_value          = 3.0
-bias_min_value          = -3.0
+bias_max_value          = 2.0
+bias_min_value          = -2.0
 bias_mutate_power       = 0.5
 bias_mutate_rate        = 0.2
 bias_replace_rate       = 0.3
@@ -53,8 +53,8 @@ num_outputs             = 1
 # node response options
 response_init_mean      = 1.0
 response_init_stdev     = 0.1
-response_max_value      = 10.0
-response_min_value      = -10.0
+response_max_value      = 5.0
+response_min_value      = -5.0
 response_mutate_power   = 0.3
 response_mutate_rate    = 0.75
 response_replace_rate   = 0.1
@@ -62,8 +62,8 @@ response_replace_rate   = 0.1
 # connection weight options
 weight_init_mean        = 0.1
 weight_init_stdev       = 1.0
-weight_max_value        = 5
-weight_min_value        = -5
+weight_max_value        = 3
+weight_min_value        = -3
 weight_mutate_power     = 0.5
 weight_mutate_rate      = 0.8
 weight_replace_rate     = 0.3
@@ -78,4 +78,4 @@ max_stagnation = 4
 
 [DefaultReproduction]
 elitism            = 2
-survival_threshold = 0.2
+survival_threshold = 0.15
